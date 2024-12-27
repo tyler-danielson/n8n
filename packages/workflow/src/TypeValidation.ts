@@ -331,10 +331,9 @@ export function validateFieldType(
 		}
 		case 'number': {
 			try {
-				if (strict && typeof value !== 'number') {
-					return { valid: false, errorMessage: defaultErrorMessage };
-				}
-				return { valid: true, newValue: tryToParseNumber(value) };
+				return strict
+					? { valid: false, errorMessage: defaultErrorMessage }
+					: { valid: true, newValue: tryToParseNumber(value) };
 			} catch (e) {
 				return { valid: false, errorMessage: defaultErrorMessage };
 			}
