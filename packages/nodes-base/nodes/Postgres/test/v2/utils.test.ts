@@ -387,6 +387,18 @@ describe('Test PostgresV2, checkItemAgainstSchema', () => {
 	});
 });
 
+describe('Test PostgresV2, hasJsonDataType', () => {
+	it('returns true if there are columns which are of type json', () => {});
+
+	it('returns false if there are columns which are of type json', () => {});
+});
+
+describe('Test PostgresV2, isValidJsonColumnValid', () => {
+	it('returns false if the type of the values passed in are invalid for the json column', () => {});
+
+	it('returns true if the type of the values passed in are valid for the json column', () => {});
+});
+
 describe('Test PostgresV2, convertArraysToPostgresFormat', () => {
 	it('should convert js arrays to postgres format', () => {
 		const item = {

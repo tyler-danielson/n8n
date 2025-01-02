@@ -600,6 +600,11 @@ describe('Test PostgresV2, insert operation', () => {
 			nodeOptions,
 		);
 	});
+
+	// TODO: Check if utils are called
+	it('dataMode: define, should accept an array with values if column is of type json', async () => {});
+
+	it('dataMode: define, should accept an empty array if column is of type json', async () => {});
 });
 
 describe('Test PostgresV2, select operation', () => {
