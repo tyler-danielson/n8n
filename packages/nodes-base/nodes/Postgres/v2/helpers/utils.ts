@@ -394,6 +394,19 @@ export function prepareItem(values: IDataObject[]) {
 	return item;
 }
 
+export function hasJsonDataType(schema: ColumnInfo[]) {
+	return schema.some(({ data_type }) => data_type === 'json');
+}
+
+export function isValidJsonColumnValid(schema: ColumnInfo[], values: IDataObject) {
+	const jsonColumns = schema.filter(({ data_type }: { data_type: string }) => data_type === 'json');
+
+	return jsonColumns.every(
+		({ column_name }) =>
+			typeof values[column_name] === 'object' || Array.isArray(values[column_name]), // array is of type object in JS
+	);
+}
+
 export async function columnFeatureSupport(
 	db: PgpDatabase,
 ): Promise<{ identity_generation: boolean; is_generated: boolean }> {
