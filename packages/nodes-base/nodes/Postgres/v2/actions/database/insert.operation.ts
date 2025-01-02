@@ -1,8 +1,9 @@
-import type {
-	IDataObject,
-	IExecuteFunctions,
-	INodeExecutionData,
-	INodeProperties,
+import {
+	ApplicationError,
+	type IDataObject,
+	type IExecuteFunctions,
+	type INodeExecutionData,
+	type INodeProperties,
 } from 'n8n-workflow';
 
 import { updateDisplayOptions } from '@utils/utilities';
@@ -22,6 +23,8 @@ import {
 	prepareItem,
 	convertArraysToPostgresFormat,
 	replaceEmptyStringsByNulls,
+	hasJsonDataType,
+	isValidJsonColumnValid,
 } from '../../helpers/utils';
 import { optionsCollection } from '../common.descriptions';
 
@@ -215,10 +218,15 @@ export async function execute(
 					: ((this.getNodeParameter('columns.values', i, []) as IDataObject)
 							.values as IDataObject[]);
 
-			if (nodeVersion < 2.2) {
-				item = prepareItem(valuesToSend);
-			} else {
-				item = this.getNodeParameter('columns.value', i) as IDataObject;
+			item =
+				nodeVersion < 2.2
+					? prepareItem(valuesToSend)
+					: hasJsonDataType(tableSchema)
+						? ((this.getNodeParameter('columns', i) as IDataObject)?.value as IDataObject)
+						: (this.getNodeParameter('columns.value', i) as IDataObject);
+
+			if (hasJsonDataType(tableSchema) && !isValidJsonColumnValid(tableSchema, item)) {
+				throw new ApplicationError('Invalid type for JSON column');
 			}
 		}
 
