@@ -27,6 +27,8 @@ export const NO_OP_NODE_TYPE = 'n8n-nodes-base.noOp';
 export const HTTP_REQUEST_NODE_TYPE = 'n8n-nodes-base.httpRequest';
 export const WEBHOOK_NODE_TYPE = 'n8n-nodes-base.webhook';
 export const MANUAL_TRIGGER_NODE_TYPE = 'n8n-nodes-base.manualTrigger';
+export const EVALUATION_TRIGGER_NODE_TYPE = 'n8n-nodes-base.evaluationTrigger';
+export const EVALUATION_NODE_TYPE = 'n8n-nodes-base.evaluation';
 export const ERROR_TRIGGER_NODE_TYPE = 'n8n-nodes-base.errorTrigger';
 export const START_NODE_TYPE = 'n8n-nodes-base.start';
 export const EXECUTE_WORKFLOW_NODE_TYPE = 'n8n-nodes-base.executeWorkflow';
@@ -46,6 +48,7 @@ export const STARTING_NODE_TYPES = [
 	EXECUTE_WORKFLOW_TRIGGER_NODE_TYPE,
 	ERROR_TRIGGER_NODE_TYPE,
 	START_NODE_TYPE,
+	EVALUATION_TRIGGER_NODE_TYPE,
 ];
 
 export const SCRIPTING_NODE_TYPES = [
@@ -95,3 +98,13 @@ export const AI_TRANSFORM_JS_CODE = 'jsCode';
  * in `cli` package.
  */
 export const TRIMMED_TASK_DATA_CONNECTIONS_KEY = '__isTrimmedManualExecutionDataItem';
+
+export const OPEN_AI_API_CREDENTIAL_TYPE = 'openAiApi';
+export const FREE_AI_CREDITS_ERROR_TYPE = 'free_ai_credits_request_error';
+export const FREE_AI_CREDITS_USED_ALL_CREDITS_ERROR_CODE = 400;
+
+export const FROM_AI_AUTO_GENERATED_MARKER = '/*n8n-auto-generated-fromAI-override*/';
+
+export const PROJECT_ROOT = '0';
+
+export const WAITING_FORMS_EXECUTION_STATUS = 'n8n-execution-status';

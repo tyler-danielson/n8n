@@ -7,7 +7,7 @@ import type {
 	IHttpRequestMethods,
 	IRequestOptions,
 } from 'n8n-workflow';
-import { NodeApiError } from 'n8n-workflow';
+import { isSafeObjectProperty, NodeApiError } from 'n8n-workflow';
 
 import { getGoogleAccessToken } from '../../GenericFunctions';
 
@@ -104,10 +104,11 @@ export function jsonToDocument(value: string | number | IDataObject | IDataObjec
 	} else if (value && value.constructor === Array) {
 		return { arrayValue: { values: value.map((v) => jsonToDocument(v)) } };
 	} else if (typeof value === 'object') {
-		const obj = {};
-		for (const o of Object.keys(value)) {
-			//@ts-ignore
-			obj[o] = jsonToDocument(value[o] as IDataObject);
+		const obj: IDataObject = {};
+		for (const key of Object.keys(value)) {
+			if (value.hasOwnProperty(key) && isSafeObjectProperty(key)) {
+				obj[key] = jsonToDocument((value as IDataObject)[key] as IDataObject);
+			}
 		}
 		return { mapValue: { fields: obj } };
 	}
