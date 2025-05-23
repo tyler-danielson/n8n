@@ -3,7 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, nextTick, type Ref } from 'v
 import { useRoute, useRouter } from 'vue-router';
 import { useBecomeTemplateCreatorStore } from '@/components/BecomeTemplateCreatorCta/becomeTemplateCreatorStore';
 import { useCloudPlanStore } from '@/stores/cloudPlan.store';
-import { useRootStore } from '@n8n/stores/useRootStore';
+import { useRootStore } from '@/stores/root.store';
 import { useSettingsStore } from '@/stores/settings.store';
 import { useTemplatesStore } from '@/stores/templates.store';
 import { useUIStore } from '@/stores/ui.store';
@@ -24,7 +24,7 @@ import { useBugReporting } from '@/composables/useBugReporting';
 import { usePageRedirectionHelper } from '@/composables/usePageRedirectionHelper';
 
 import { useGlobalEntityCreation } from '@/composables/useGlobalEntityCreation';
-import { N8nNavigationDropdown, N8nTooltip, N8nLink, N8nIconButton } from '@n8n/design-system';
+import { N8nNavigationDropdown, N8nTooltip, N8nLink, N8nIconButton } from 'n8n-design-system';
 import { onClickOutside, type VueInstance } from '@vueuse/core';
 import Logo from './Logo/Logo.vue';
 
@@ -103,17 +103,6 @@ const mainMenuItems = computed(() => [
 		customIconSize: 'medium',
 		position: 'bottom',
 		route: { to: { name: VIEWS.VARIABLES } },
-	},
-	{
-		id: 'insights',
-		icon: 'chart-bar',
-		label: 'Insights',
-		customIconSize: 'medium',
-		position: 'bottom',
-		route: { to: { name: VIEWS.INSIGHTS } },
-		available:
-			settingsStore.settings.insights.enabled &&
-			hasPermission(['rbac'], { rbac: { scope: 'insights:list' } }),
 	},
 	{
 		id: 'help',
@@ -196,9 +185,12 @@ onMounted(async () => {
 		});
 	}
 
-	becomeTemplateCreatorStore.startMonitoringCta();
+	await nextTick(() => {
+		uiStore.sidebarMenuCollapsed = window.innerWidth < 900;
+		fullyExpanded.value = !isCollapsed.value;
+	});
 
-	await nextTick(onResizeEnd);
+	becomeTemplateCreatorStore.startMonitoringCta();
 });
 
 onBeforeUnmount(() => {
@@ -276,28 +268,27 @@ const handleSelect = (key: string) => {
 			trackHelpItemClick(key);
 			break;
 		}
-		case 'insights':
-			telemetry.track('User clicked insights link from side menu');
 		default:
 			break;
 	}
 };
 
-function onResize() {
-	void callDebounced(onResizeEnd, { debounceTime: 250 });
-}
+const onResize = (event: UIEvent) => {
+	void callDebounced(onResizeEnd, { debounceTime: 100 }, event);
+};
 
-async function onResizeEnd() {
-	if (window.outerWidth < 900) {
+const onResizeEnd = async (event: UIEvent) => {
+	const browserWidth = (event.target as Window).outerWidth;
+	await checkWidthAndAdjustSidebar(browserWidth);
+};
+
+const checkWidthAndAdjustSidebar = async (width: number) => {
+	if (width < 900) {
 		uiStore.sidebarMenuCollapsed = true;
-	} else {
-		uiStore.sidebarMenuCollapsed = uiStore.sidebarMenuCollapsedPreference;
-	}
-
-	void nextTick(() => {
+		await nextTick();
 		fullyExpanded.value = !isCollapsed.value;
-	});
-}
+	}
+};
 
 const {
 	menu,
@@ -307,7 +298,6 @@ const {
 	createCredentialsAppendSlotName,
 	projectsLimitReachedMessage,
 	upgradeLabel,
-	hasPermissionToCreateProjects,
 } = useGlobalEntityCreation();
 onClickOutside(createBtn as Ref<VueInstance>, () => {
 	createBtn.value?.close();
@@ -328,8 +318,8 @@ onClickOutside(createBtn as Ref<VueInstance>, () => {
 			:class="['clickable', $style.sideMenuCollapseButton]"
 			@click="toggleCollapse"
 		>
-			<N8nIcon v-if="isCollapsed" icon="chevron-right" size="xsmall" class="ml-5xs" />
-			<N8nIcon v-else icon="chevron-left" size="xsmall" class="mr-5xs" />
+			<N8nIcon v-if="isCollapsed" icon="arrow-right" size="xsmall" class="ml-5xs" color="var(--prim-color-primary)"/>
+			<N8nIcon v-else icon="arrow-left" size="xsmall" class="mr-5xs" color="var(--prim-color-primary)"/>
 		</div>
 		<div :class="$style.logo">
 			<Logo
@@ -353,12 +343,7 @@ onClickOutside(createBtn as Ref<VueInstance>, () => {
 							</template>
 						</i18n-t>
 					</template>
-					<N8nIcon
-						data-test-id="read-only-env-icon"
-						icon="lock"
-						size="xsmall"
-						:class="$style.readOnlyEnvironmentIcon"
-					/>
+					<N8nIcon icon="lock" size="xsmall" :class="$style.readOnlyEnvironmentIcon" />
 				</N8nTooltip>
 			</Logo>
 			<N8nNavigationDropdown
@@ -387,26 +372,8 @@ onClickOutside(createBtn as Ref<VueInstance>, () => {
 					</N8nTooltip>
 				</template>
 				<template #[createProjectAppendSlotName]="{ item }">
-					<N8nTooltip
-						v-if="sourceControlStore.preferences.branchReadOnly"
-						placement="right"
-						:content="i18n.baseText('readOnlyEnv.cantAdd.project')"
-					>
-						<N8nIcon style="margin-left: auto; margin-right: 5px" icon="lock" size="xsmall" />
-					</N8nTooltip>
-					<N8nTooltip
-						v-else-if="item.disabled"
-						placement="right"
-						:content="projectsLimitReachedMessage"
-					>
-						<N8nIcon
-							v-if="!hasPermissionToCreateProjects"
-							style="margin-left: auto; margin-right: 5px"
-							icon="lock"
-							size="xsmall"
-						/>
+					<N8nTooltip v-if="item.disabled" placement="right" :content="projectsLimitReachedMessage">
 						<N8nButton
-							v-else
 							:size="'mini'"
 							style="margin-left: auto"
 							type="tertiary"
@@ -499,17 +466,19 @@ onClickOutside(createBtn as Ref<VueInstance>, () => {
 
 <style lang="scss" module>
 .sideMenu {
-	display: grid;
 	position: relative;
 	height: 100%;
-	grid-template-rows: auto 1fr auto;
-	border-right: var(--border-width-base) var(--border-style-base) var(--color-foreground-base);
+	border-right: 2px var(--border-style-base) var(--prim-color-primary);
 	transition: width 150ms ease-in-out;
-	min-width: $sidebar-expanded-width;
-	max-width: 244px;
-	background-color: var(--menu-background, var(--color-background-xlight));
+	width: $sidebar-expanded-width;
+	padding-top: 54px;
+	background-color: var(--accent-color-3);
 
 	.logo {
+		position: absolute;
+		top: 0;
+		left: 0;
+		width: 100%;
 		display: flex;
 		align-items: center;
 		padding: var(--spacing-xs);
@@ -524,7 +493,7 @@ onClickOutside(createBtn as Ref<VueInstance>, () => {
 
 	&.sideMenuCollapsed {
 		width: $sidebar-width;
-		min-width: auto;
+		padding-top: 100px;
 
 		.logo {
 			flex-direction: column;
@@ -542,10 +511,10 @@ onClickOutside(createBtn as Ref<VueInstance>, () => {
 	justify-content: center;
 	align-items: center;
 	color: var(--color-text-base);
-	background-color: var(--color-foreground-xlight);
+	background-color: var(--accent-color-3);
 	width: 20px;
 	height: 20px;
-	border: var(--border-width-base) var(--border-style-base) var(--color-foreground-base);
+	border: var(--border-width-base) var(--border-style-base) var(--prim-color-primary);
 	border-radius: 50%;
 
 	&:hover {
@@ -624,6 +593,6 @@ onClickOutside(createBtn as Ref<VueInstance>, () => {
 	align-self: center;
 	padding: 2px;
 	border-radius: var(--border-radius-small);
-	margin: 7px 12px 0 5px;
+	margin: 5px 5px 0;
 }
 </style>
