@@ -136,7 +136,7 @@ describe('NodesListPanel', () => {
 
 			await nextTick();
 			expect(screen.getByText('What happens next?')).toBeInTheDocument();
-			expect(screen.queryAllByTestId('item-iterator-item')).toHaveLength(6);
+			expect(screen.queryAllByTestId('item-iterator-item')).toHaveLength(5);
 
 			screen.getByText('Action in an app').click();
 			await nextTick();
@@ -246,22 +246,6 @@ describe('NodesListPanel', () => {
 			await fireEvent.click(container.querySelector('.clear')!);
 			await nextTick();
 			expect(screen.queryAllByTestId('item-iterator-item')).toHaveLength(9);
-		});
-
-		it('should trim search input before emitting update', async () => {
-			renderComponent();
-			await nextTick();
-
-			expect(screen.queryByTestId('node-creator-search-bar')).toBeInTheDocument();
-			await fireEvent.input(screen.getByTestId('node-creator-search-bar'), {
-				target: { value: '    Node 1' },
-			});
-			await nextTick();
-
-			expect(screen.queryAllByTestId('item-iterator-item')).toHaveLength(1);
-			expect(screen.queryByText('Node 1')).toBeInTheDocument();
-
-			expect(screen.getByTestId('node-creator-search-bar')).toHaveValue('Node 1');
 		});
 	});
 });

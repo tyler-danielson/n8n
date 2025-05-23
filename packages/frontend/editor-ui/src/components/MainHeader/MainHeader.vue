@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import TabBar from '@/components/MainHeader/TabBar.vue';
+import { ref, computed, watch, onBeforeMount, onBeforeUnmount, onMounted } from 'vue';
+import type { RouteLocation, RouteLocationRaw } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import WorkflowDetails from '@/components/MainHeader/WorkflowDetails.vue';
-import { useI18n } from '@/composables/useI18n';
-import { usePushConnection } from '@/composables/usePushConnection';
+import TabBar from '@/components/MainHeader/TabBar.vue';
 import {
 	LOCAL_STORAGE_HIDE_GITHUB_STAR_BUTTON,
 	MAIN_HEADER_TABS,
@@ -10,22 +11,19 @@ import {
 	STICKY_NODE_TYPE,
 	VIEWS,
 	WORKFLOW_EVALUATION_EXPERIMENT,
-	N8N_MAIN_GITHUB_REPO_URL,
 } from '@/constants';
-import { useExecutionsStore } from '@/stores/executions.store';
+import { useI18n } from '@/composables/useI18n';
 import { useNDVStore } from '@/stores/ndv.store';
-import { usePostHog } from '@/stores/posthog.store';
-import { useSettingsStore } from '@/stores/settings.store';
 import { useSourceControlStore } from '@/stores/sourceControl.store';
 import { useUIStore } from '@/stores/ui.store';
 import { useWorkflowsStore } from '@/stores/workflows.store';
-import { computed, onBeforeMount, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import type { RouteLocation, RouteLocationRaw } from 'vue-router';
-import { useRoute, useRouter } from 'vue-router';
+import { useExecutionsStore } from '@/stores/executions.store';
+import { useSettingsStore } from '@/stores/settings.store';
+import { usePushConnection } from '@/composables/usePushConnection';
+import { usePostHog } from '@/stores/posthog.store';
 
-import { useLocalStorage } from '@vueuse/core';
 import GithubButton from 'vue-github-button';
-import type { FolderShortInfo } from '@/Interface';
+import { useLocalStorage } from '@vueuse/core';
 
 const router = useRouter();
 const route = useRoute();
@@ -45,24 +43,6 @@ const executionToReturnTo = ref('');
 const dirtyState = ref(false);
 const githubButtonHidden = useLocalStorage(LOCAL_STORAGE_HIDE_GITHUB_STAR_BUTTON, false);
 
-// Track the routes that are used for the tabs
-// This is used to determine which tab to show when the route changes
-// TODO: It might be easier to manage this in the router config, by passing meta information to the routes
-// This would allow us to specify it just once on the root route, and then have the tabs be determined for children
-const testDefinitionRoutes: VIEWS[] = [
-	VIEWS.TEST_DEFINITION,
-	VIEWS.TEST_DEFINITION_EDIT,
-	VIEWS.TEST_DEFINITION_RUNS_DETAIL,
-	VIEWS.TEST_DEFINITION_RUNS_COMPARE,
-];
-
-const workflowRoutes: VIEWS[] = [VIEWS.WORKFLOW, VIEWS.NEW_WORKFLOW, VIEWS.EXECUTION_DEBUG];
-
-const executionRoutes: VIEWS[] = [
-	VIEWS.EXECUTION_HOME,
-	VIEWS.WORKFLOW_EXECUTIONS,
-	VIEWS.EXECUTION_PREVIEW,
-];
 const tabBarItems = computed(() => {
 	const items = [
 		{ value: MAIN_HEADER_TABS.WORKFLOW, label: locale.baseText('generic.editor') },
@@ -95,17 +75,6 @@ const showGitHubButton = computed(
 	() => !isEnterprise.value && !settingsStore.settings.inE2ETests && !githubButtonHidden.value,
 );
 
-const parentFolderForBreadcrumbs = computed<FolderShortInfo | undefined>(() => {
-	if (!workflow.value.parentFolder) {
-		return undefined;
-	}
-	return {
-		id: workflow.value.parentFolder.id,
-		name: workflow.value.parentFolder.name,
-		parentFolder: workflow.value.parentFolder.parentFolderId ?? undefined,
-	};
-});
-
 watch(route, (to, from) => {
 	syncTabsWithRoute(to, from);
 });
@@ -123,30 +92,24 @@ onMounted(async () => {
 	syncTabsWithRoute(route);
 });
 
-function isViewRoute(name: unknown): name is VIEWS {
-	return (
-		typeof name === 'string' &&
-		[testDefinitionRoutes, workflowRoutes, executionRoutes].flat().includes(name as VIEWS)
-	);
-}
-
 function syncTabsWithRoute(to: RouteLocation, from?: RouteLocation): void {
-	// Map route types to their corresponding tab in the header
-	const routeTabMapping = [
-		{ routes: testDefinitionRoutes, tab: MAIN_HEADER_TABS.TEST_DEFINITION },
-		{ routes: executionRoutes, tab: MAIN_HEADER_TABS.EXECUTIONS },
-		{ routes: workflowRoutes, tab: MAIN_HEADER_TABS.WORKFLOW },
-	];
-
-	// Update the active tab based on the current route
-	if (to.name && isViewRoute(to.name)) {
-		const matchingTab = routeTabMapping.find(({ routes }) => routes.includes(to.name as VIEWS));
-		if (matchingTab) {
-			activeHeaderTab.value = matchingTab.tab;
-		}
+	if (to.matched.some((record) => record.name === VIEWS.TEST_DEFINITION)) {
+		activeHeaderTab.value = MAIN_HEADER_TABS.TEST_DEFINITION;
+	}
+	if (
+		to.name === VIEWS.EXECUTION_HOME ||
+		to.name === VIEWS.WORKFLOW_EXECUTIONS ||
+		to.name === VIEWS.EXECUTION_PREVIEW
+	) {
+		activeHeaderTab.value = MAIN_HEADER_TABS.EXECUTIONS;
+	} else if (
+		to.name === VIEWS.WORKFLOW ||
+		to.name === VIEWS.NEW_WORKFLOW ||
+		to.name === VIEWS.EXECUTION_DEBUG
+	) {
+		activeHeaderTab.value = MAIN_HEADER_TABS.WORKFLOW;
 	}
 
-	// Store the current workflow ID, but only if it's not a new workflow
 	if (to.params.name !== 'new' && typeof to.params.name === 'string') {
 		workflowToReturnTo.value = to.params.name;
 	}
@@ -236,11 +199,9 @@ function hideGithubButton() {
 </script>
 
 <template>
-	<div :class="$style.container">
-		<div
-			:class="{ [$style['main-header']]: true, [$style.expanded]: !uiStore.sidebarMenuCollapsed }"
-		>
-			<div v-show="!hideMenuBar" :class="$style['top-menu']">
+	<div class="container">
+		<div :class="{ 'main-header': true, expanded: !uiStore.sidebarMenuCollapsed }">
+			<div v-show="!hideMenuBar" class="top-menu">
 				<WorkflowDetails
 					v-if="workflow?.name"
 					:id="workflow.id"
@@ -250,28 +211,7 @@ function hideGithubButton() {
 					:scopes="workflow.scopes"
 					:active="workflow.active"
 					:read-only="readOnly"
-					:current-folder="parentFolderForBreadcrumbs"
-					:is-archived="workflow.isArchived"
 				/>
-				<div v-if="showGitHubButton" :class="[$style['github-button'], 'hidden-sm-and-down']">
-					<div :class="$style['github-button-container']">
-						<GithubButton
-							:href="N8N_MAIN_GITHUB_REPO_URL"
-							:data-color-scheme="uiStore.appliedTheme"
-							data-size="large"
-							data-show-count="true"
-							:aria-label="locale.baseText('editor.mainHeader.githubButton.label')"
-						>
-							{{ locale.baseText('generic.star') }}
-						</GithubButton>
-						<N8nIcon
-							:class="$style['close-github-button']"
-							icon="times-circle"
-							size="medium"
-							@click="hideGithubButton"
-						/>
-					</div>
-				</div>
 			</div>
 			<TabBar
 				v-if="onWorkflowPage"
@@ -280,10 +220,29 @@ function hideGithubButton() {
 				@update:model-value="onTabSelected"
 			/>
 		</div>
+		<div v-if="showGitHubButton" class="github-button">
+			<div class="github-button-container">
+				<GithubButton
+					href="https://github.com/n8n-io/n8n"
+					:data-color-scheme="uiStore.appliedTheme"
+					data-size="large"
+					data-show-count="true"
+					aria-label="Star n8n-io/n8n on GitHub"
+				>
+					Star
+				</GithubButton>
+				<N8nIcon
+					class="close-github-button"
+					icon="times-circle"
+					size="medium"
+					@click="hideGithubButton"
+				/>
+			</div>
+		</div>
 	</div>
 </template>
 
-<style module lang="scss">
+<style lang="scss">
 .container {
 	display: flex;
 	position: relative;
@@ -292,8 +251,7 @@ function hideGithubButton() {
 }
 
 .main-header {
-	min-height: var(--navbar--height);
-	background-color: var(--color-background-xlight);
+	background-color: var(--black);//var(--color-background-xlight);
 	width: 100%;
 	box-sizing: border-box;
 	border-bottom: var(--border-width-base) var(--border-style-base) var(--color-foreground-base);
@@ -302,21 +260,27 @@ function hideGithubButton() {
 .top-menu {
 	position: relative;
 	display: flex;
-	height: var(--navbar--height);
 	align-items: center;
 	font-size: 0.9em;
-	font-weight: var(--font-weight-regular);
-	overflow-x: auto;
-	overflow-y: hidden;
+	font-weight: 400;
+	padding: var(--spacing-xs) var(--spacing-m);
+	
 }
 
 .github-button {
 	display: flex;
+	position: relative;
 	align-items: center;
 	align-self: stretch;
-	padding: var(--spacing-5xs) var(--spacing-m);
+	justify-content: center;
+	min-width: 170px;
+	padding-top: 2px;
+	padding-left: var(--spacing-m);
+	padding-right: var(--spacing-m);
 	background-color: var(--color-background-xlight);
+	border-bottom: var(--border-width-base) var(--border-style-base) var(--color-foreground-base);
 	border-left: var(--border-width-base) var(--border-style-base) var(--color-foreground-base);
+	
 }
 
 .close-github-button {
@@ -329,16 +293,19 @@ function hideGithubButton() {
 	background-color: var(--color-background-xlight);
 	border-radius: 100%;
 	cursor: pointer;
-
+	
 	&:hover {
 		color: var(--prim-color-primary-shade-100);
 	}
+	
 }
 .github-button-container {
 	position: relative;
+	visibility: hidden
 }
 
 .github-button:hover .close-github-button {
-	display: block;
+	display: none;
+	visibility: hidden
 }
 </style>

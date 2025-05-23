@@ -78,7 +78,6 @@ function onRetryMenuItemSelect(action: string): void {
 			:to="{
 				name: VIEWS.EXECUTION_PREVIEW,
 				params: { name: currentWorkflow, executionId: execution.id },
-				query: route.query,
 			}"
 			:data-test-execution-status="executionUIDetails.name"
 		>
@@ -108,11 +107,9 @@ function onRetryMenuItemSelect(action: string): void {
 						v-if="executionUIDetails.name === 'running'"
 						:color="isActive ? 'text-dark' : 'text-base'"
 						size="small"
-						data-test-id="execution-time-in-status"
 					>
 						{{ locale.baseText('executionDetails.runningTimeRunning') }}
-						<!-- Just here to make typescript happy, since `startedAt` will always be defined for running executions -->
-						<ExecutionsTime :start-time="execution.startedAt ?? execution.createdAt" />
+						<ExecutionsTime :start-time="execution.startedAt" />
 					</N8nText>
 					<N8nText
 						v-if="executionUIDetails.name === 'new' && execution.createdAt"
@@ -170,13 +167,11 @@ function onRetryMenuItemSelect(action: string): void {
 					<template #content>
 						<span>{{ locale.baseText('executionsList.test') }}</span>
 					</template>
-					<FontAwesomeIcon :class="[$style.icon, $style.manual]" icon="flask" />
-				</N8nTooltip>
-				<N8nTooltip v-if="execution.mode === 'evaluation'" placement="top">
-					<template #content>
-						<span>{{ locale.baseText('executionsList.evaluation') }}</span>
-					</template>
-					<FontAwesomeIcon :class="[$style.icon, $style.evaluation]" icon="tasks" />
+					<FontAwesomeIcon
+						v-if="execution.mode === 'manual'"
+						:class="[$style.icon, $style.manual]"
+						icon="flask"
+					/>
 				</N8nTooltip>
 			</div>
 		</router-link>
@@ -187,7 +182,7 @@ function onRetryMenuItemSelect(action: string): void {
 @import '@/styles/variables';
 
 .WorkflowExecutionsCard {
-	--execution-list-item-background: var(--execution-card-background);
+	--execution-list-item-background: var(--color-foreground-xlight);
 	--execution-list-item-highlight-background: var(--color-warning-tint-1);
 
 	display: flex;
@@ -205,7 +200,7 @@ function onRetryMenuItemSelect(action: string): void {
 	&:hover,
 	&.active {
 		.executionLink {
-			--execution-list-item-background: var(--execution-card-background-hover);
+			--execution-list-item-background: var(--color-foreground-light);
 		}
 	}
 

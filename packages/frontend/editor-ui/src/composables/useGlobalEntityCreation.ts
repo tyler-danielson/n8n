@@ -2,7 +2,7 @@ import { computed, ref } from 'vue';
 import { VIEWS } from '@/constants';
 import { useRouter } from 'vue-router';
 import { useI18n } from '@/composables/useI18n';
-import { sortByProperty } from '@n8n/utils/sort/sortByProperty';
+import { sortByProperty } from '@/utils/sortUtils';
 import { useToast } from '@/composables/useToast';
 import { useProjectsStore } from '@/stores/projects.store';
 import { useSettingsStore } from '@/stores/settings.store';
@@ -34,7 +34,6 @@ export const useGlobalEntityCreation = () => {
 	const cloudPlanStore = useCloudPlanStore();
 	const projectsStore = useProjectsStore();
 	const sourceControlStore = useSourceControlStore();
-
 	const router = useRouter();
 	const i18n = useI18n();
 	const toast = useToast();
@@ -163,7 +162,7 @@ export const useGlobalEntityCreation = () => {
 			{
 				id: CREATE_PROJECT_ID,
 				title: 'Project',
-				disabled: !projectsStore.canCreateProjects || !projectsStore.hasPermissionToCreateProjects,
+				disabled: !projectsStore.canCreateProjects,
 			},
 		];
 	});
@@ -193,7 +192,7 @@ export const useGlobalEntityCreation = () => {
 	const handleSelect = (id: string) => {
 		if (id !== CREATE_PROJECT_ID) return;
 
-		if (projectsStore.canCreateProjects && projectsStore.hasPermissionToCreateProjects) {
+		if (projectsStore.canCreateProjects) {
 			void createProject();
 			return;
 		}
@@ -204,6 +203,7 @@ export const useGlobalEntityCreation = () => {
 	const projectsLimitReachedMessage = computed(() => {
 		if (settingsStore.isCloudDeployment) {
 			return i18n.baseText('projects.create.limitReached.cloud', {
+				adjustToNumber: projectsStore.teamProjectsLimit,
 				interpolate: {
 					planName: cloudPlanStore.currentPlanData?.displayName ?? '',
 					limit: projectsStore.teamProjectsLimit,
@@ -215,11 +215,8 @@ export const useGlobalEntityCreation = () => {
 			return i18n.baseText('projects.create.limitReached.self');
 		}
 
-		if (!projectsStore.hasPermissionToCreateProjects) {
-			return i18n.baseText('projects.create.permissionDenied');
-		}
-
 		return i18n.baseText('projects.create.limitReached', {
+			adjustToNumber: projectsStore.teamProjectsLimit,
 			interpolate: {
 				limit: projectsStore.teamProjectsLimit,
 			},
@@ -229,7 +226,6 @@ export const useGlobalEntityCreation = () => {
 	const createProjectAppendSlotName = computed(() => `item.append.${CREATE_PROJECT_ID}`);
 	const createWorkflowsAppendSlotName = computed(() => `item.append.${WORKFLOWS_MENU_ID}`);
 	const createCredentialsAppendSlotName = computed(() => `item.append.${CREDENTIALS_MENU_ID}`);
-	const hasPermissionToCreateProjects = projectsStore.hasPermissionToCreateProjects;
 
 	const upgradeLabel = computed(() => {
 		if (settingsStore.isCloudDeployment) {
@@ -250,7 +246,6 @@ export const useGlobalEntityCreation = () => {
 		createWorkflowsAppendSlotName,
 		createCredentialsAppendSlotName,
 		projectsLimitReachedMessage,
-		hasPermissionToCreateProjects,
 		upgradeLabel,
 		createProject,
 		isCreatingProject,

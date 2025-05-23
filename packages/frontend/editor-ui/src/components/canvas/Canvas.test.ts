@@ -5,37 +5,25 @@ import Canvas from '@/components/canvas/Canvas.vue';
 import { createPinia, setActivePinia } from 'pinia';
 import type { CanvasConnection, CanvasNode } from '@/types';
 import { createCanvasConnection, createCanvasNodeElement } from '@/__tests__/data';
-import { NodeConnectionTypes } from 'n8n-workflow';
-import type { useDeviceSupport } from '@n8n/composables/useDeviceSupport';
-import { useVueFlow } from '@vue-flow/core';
-import { SIMULATE_NODE_TYPE } from '@/constants';
-import { canvasEventBus } from '@/event-bus/canvas';
+import { NodeConnectionType } from 'n8n-workflow';
+import type { useDeviceSupport } from 'n8n-design-system';
 
 const matchMedia = global.window.matchMedia;
 // @ts-expect-error Initialize window object
 global.window = jsdom.window as unknown as Window & typeof globalThis;
 global.window.matchMedia = matchMedia;
 
-vi.mock('@n8n/design-system', async (importOriginal) => {
+vi.mock('n8n-design-system', async (importOriginal) => {
 	const actual = await importOriginal<typeof useDeviceSupport>();
 	return { ...actual, useDeviceSupport: vi.fn(() => ({ isCtrlKeyPressed: vi.fn() })) };
 });
-
-const canvasId = 'canvas';
 
 let renderComponent: ReturnType<typeof createComponentRenderer>;
 beforeEach(() => {
 	const pinia = createPinia();
 	setActivePinia(pinia);
 
-	renderComponent = createComponentRenderer(Canvas, {
-		pinia,
-		props: {
-			id: canvasId,
-			nodes: [],
-			connections: [],
-		},
-	});
+	renderComponent = createComponentRenderer(Canvas, { pinia });
 });
 
 afterEach(() => {
@@ -61,7 +49,7 @@ describe('Canvas', () => {
 				data: {
 					outputs: [
 						{
-							type: NodeConnectionTypes.Main,
+							type: NodeConnectionType.Main,
 							index: 0,
 						},
 					],
@@ -74,7 +62,7 @@ describe('Canvas', () => {
 				data: {
 					inputs: [
 						{
-							type: NodeConnectionTypes.Main,
+							type: NodeConnectionType.Main,
 							index: 0,
 						},
 					],
@@ -98,7 +86,7 @@ describe('Canvas', () => {
 		expect(container.querySelector(`[data-id="${connections[0].id}"]`)).toBeInTheDocument();
 	});
 
-	it('should emit `update:nodes:position` event', async () => {
+	it('should handle `update:nodes:position` event', async () => {
 		const nodes = [createCanvasNodeElement()];
 		const { container, emitted } = renderComponent({
 			props: {
@@ -132,73 +120,6 @@ describe('Canvas', () => {
 				],
 			],
 		]);
-	});
-
-	it('should emit `update:node:name` event', async () => {
-		const nodes = [createCanvasNodeElement()];
-		const { container, emitted } = renderComponent({
-			props: {
-				nodes,
-			},
-		});
-
-		await waitFor(() => expect(container.querySelectorAll('.vue-flow__node')).toHaveLength(1));
-
-		const node = container.querySelector(`[data-id="${nodes[0].id}"]`) as Element;
-
-		const { addSelectedNodes, nodes: graphNodes } = useVueFlow({ id: canvasId });
-		addSelectedNodes(graphNodes.value);
-
-		await waitFor(() => expect(container.querySelector('.selected')).toBeInTheDocument());
-
-		await fireEvent.keyDown(node, { key: ' ', view: window });
-		await fireEvent.keyUp(node, { key: ' ', view: window });
-
-		expect(emitted()['update:node:name']).toEqual([['1']]);
-	});
-
-	it('should update viewport if nodes:select event is received with panIntoView=true', async () => {
-		const node = createCanvasNodeElement({ position: { x: -1000, y: -500 } });
-
-		renderComponent({
-			props: {
-				id: 'c0',
-				nodes: [node],
-				eventBus: canvasEventBus,
-			},
-		});
-
-		const { getViewport } = useVueFlow('c0');
-
-		expect(getViewport()).toEqual({ x: 0, y: 0, zoom: 1 });
-		canvasEventBus.emit('nodes:select', { ids: [node.id], panIntoView: true });
-		await waitFor(() => expect(getViewport()).toEqual({ x: 1100, y: 600, zoom: 1 }));
-	});
-
-	it('should not emit `update:node:name` event if long key press', async () => {
-		vi.useFakeTimers();
-
-		const nodes = [createCanvasNodeElement()];
-		const { container, emitted } = renderComponent({
-			props: {
-				nodes,
-			},
-		});
-
-		await waitFor(() => expect(container.querySelectorAll('.vue-flow__node')).toHaveLength(1));
-
-		const node = container.querySelector(`[data-id="${nodes[0].id}"]`) as Element;
-
-		const { addSelectedNodes, nodes: graphNodes } = useVueFlow({ id: canvasId });
-		addSelectedNodes(graphNodes.value);
-
-		await waitFor(() => expect(container.querySelector('.selected')).toBeInTheDocument());
-
-		await fireEvent.keyDown(node, { key: ' ', view: window });
-		await vi.advanceTimersByTimeAsync(1000);
-		await fireEvent.keyUp(node, { key: ' ', view: window });
-
-		expect(emitted()['update:node:name']).toBeUndefined();
 	});
 
 	describe('minimap', () => {
@@ -291,32 +212,6 @@ describe('Canvas', () => {
 			expect(patternCanvas).toBeInTheDocument();
 			expect(patternCanvas?.innerHTML).toContain('<path');
 			expect(patternCanvas?.innerHTML).not.toContain('<circle');
-		});
-	});
-
-	describe('simulate', () => {
-		it('should render simulate node', async () => {
-			const nodes = [
-				createCanvasNodeElement({
-					id: '1',
-					label: 'Node',
-					position: { x: 200, y: 200 },
-					data: {
-						type: SIMULATE_NODE_TYPE,
-						typeVersion: 1,
-					},
-				}),
-			];
-
-			const { container } = renderComponent({
-				props: {
-					nodes,
-				},
-			});
-
-			await waitFor(() => expect(container.querySelectorAll('.vue-flow__node')).toHaveLength(1));
-
-			expect(container.querySelector('.icon')).toBeInTheDocument();
 		});
 	});
 });

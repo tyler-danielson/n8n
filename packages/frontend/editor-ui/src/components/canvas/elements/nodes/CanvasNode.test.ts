@@ -1,10 +1,9 @@
 import CanvasNode from '@/components/canvas/elements/nodes/CanvasNode.vue';
 import { createComponentRenderer } from '@/__tests__/render';
 import { createPinia, setActivePinia } from 'pinia';
-import { NodeConnectionTypes } from 'n8n-workflow';
+import { NodeConnectionType } from 'n8n-workflow';
 import { fireEvent } from '@testing-library/vue';
-import { createCanvasNodeData, createCanvasNodeProps, createCanvasProvide } from '@/__tests__/data';
-import { CanvasNodeRenderType } from '@/types';
+import { createCanvasNodeProps, createCanvasProvide } from '@/__tests__/data';
 
 vi.mock('@/stores/nodeTypes.store', () => ({
 	useNodeTypesStore: vi.fn(() => ({
@@ -61,13 +60,13 @@ describe('CanvasNode', () => {
 					...createCanvasNodeProps({
 						data: {
 							inputs: [
-								{ type: NodeConnectionTypes.Main, index: 0 },
-								{ type: NodeConnectionTypes.Main, index: 0 },
-								{ type: NodeConnectionTypes.Main, index: 0 },
+								{ type: NodeConnectionType.Main, index: 0 },
+								{ type: NodeConnectionType.Main, index: 0 },
+								{ type: NodeConnectionType.Main, index: 0 },
 							],
 							outputs: [
-								{ type: NodeConnectionTypes.Main, index: 0 },
-								{ type: NodeConnectionTypes.Main, index: 0 },
+								{ type: NodeConnectionType.Main, index: 0 },
+								{ type: NodeConnectionType.Main, index: 0 },
 							],
 						},
 					}),
@@ -84,33 +83,6 @@ describe('CanvasNode', () => {
 
 			expect(inputHandles.length).toBe(3);
 			expect(outputHandles.length).toBe(2);
-		});
-
-		it('should insert spacers after required non-main input handle', () => {
-			const { getAllByTestId } = renderComponent({
-				props: {
-					...createCanvasNodeProps({
-						data: {
-							inputs: [
-								{ type: NodeConnectionTypes.Main, index: 0 },
-								{ type: NodeConnectionTypes.AiAgent, index: 0, required: true },
-								{ type: NodeConnectionTypes.AiTool, index: 0 },
-							],
-							outputs: [],
-						},
-					}),
-				},
-				global: {
-					stubs: {
-						Handle: true,
-					},
-				},
-			});
-
-			const inputHandles = getAllByTestId('canvas-node-input-handle');
-
-			expect(inputHandles[1]).toHaveStyle('left: 20%');
-			expect(inputHandles[2]).toHaveStyle('left: 80%');
 		});
 	});
 
@@ -149,32 +121,6 @@ describe('CanvasNode', () => {
 			expect(() => getByTestId('disable-node-button')).toThrow();
 			expect(() => getByTestId('delete-node-button')).toThrow();
 			expect(getByTestId('overflow-node-button')).toBeInTheDocument();
-		});
-	});
-
-	describe('execute workflow button', () => {
-		const triggerNodeData = createCanvasNodeData({
-			name: 'foo',
-			render: {
-				type: CanvasNodeRenderType.Default,
-				options: { trigger: true },
-			},
-		});
-
-		it('should render execute workflow button if the node is a trigger node and is not read only', () => {
-			const { queryByTestId } = renderComponent({
-				props: createCanvasNodeProps({ readOnly: false, data: triggerNodeData }),
-			});
-
-			expect(queryByTestId('execute-workflow-button-foo')).toBeInTheDocument();
-		});
-
-		it('should not render execute workflow button if the node is a trigger node and is read only', () => {
-			const { queryByTestId } = renderComponent({
-				props: createCanvasNodeProps({ readOnly: true, data: triggerNodeData }),
-			});
-
-			expect(queryByTestId('execute-workflow-button-foo')).not.toBeInTheDocument();
 		});
 	});
 });

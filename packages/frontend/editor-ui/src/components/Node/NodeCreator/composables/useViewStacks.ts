@@ -1,14 +1,11 @@
 import type {
-	ActionTypeDescription,
 	INodeCreateElement,
 	NodeCreateElement,
 	NodeFilterType,
 	SimplifiedNodeType,
 } from '@/Interface';
 import {
-	AI_CATEGORY_MCP_NODES,
 	AI_CATEGORY_ROOT_NODES,
-	AI_CATEGORY_TOOLS,
 	AI_CODE_NODE_TYPE,
 	AI_NODE_CREATOR_VIEW,
 	AI_OTHERS_NODE_CREATOR_VIEW,
@@ -24,7 +21,6 @@ import difference from 'lodash-es/difference';
 import { useNodeCreatorStore } from '@/stores/nodeCreator.store';
 
 import {
-	extendItemsWithUUID,
 	flattenCreateElements,
 	groupItemsInSections,
 	isAINode,
@@ -40,49 +36,43 @@ import { useI18n } from '@/composables/useI18n';
 import { useKeyboardNavigation } from './useKeyboardNavigation';
 
 import { useNodeTypesStore } from '@/stores/nodeTypes.store';
-import { AI_TRANSFORM_NODE_TYPE } from 'n8n-workflow';
-import type { NodeConnectionType, INodeInputFilter } from 'n8n-workflow';
+import {
+	AI_TRANSFORM_NODE_TYPE,
+	type INodeInputFilter,
+	type NodeConnectionType,
+	type Themed,
+} from 'n8n-workflow';
 import { useCanvasStore } from '@/stores/canvas.store';
 import { useSettingsStore } from '@/stores/settings.store';
 
-export type CommunityNodeDetails = {
-	key: string;
-	title: string;
-	description: string;
-	packageName: string;
-	installed: boolean;
-	nodeIcon?: NodeIconSource;
-};
-
-import { useUIStore } from '@/stores/ui.store';
-import { type NodeIconSource } from '@/utils/nodeIcon';
-import { getThemedValue } from '@/utils/nodeTypesUtils';
-
-export interface ViewStack {
+interface ViewStack {
 	uuid?: string;
 	title?: string;
 	subtitle?: string;
 	search?: string;
 	subcategory?: string;
 	info?: string;
-	nodeIcon?: NodeIconSource;
+	nodeIcon?: {
+		iconType?: string;
+		icon?: Themed<string>;
+		color?: string;
+	};
+	iconUrl?: string;
 	rootView?: NodeFilterType;
 	activeIndex?: number;
-	transitionDirection?: 'in' | 'out' | 'none';
+	transitionDirection?: 'in' | 'out';
 	hasSearch?: boolean;
 	preventBack?: boolean;
 	items?: INodeCreateElement[];
 	baselineItems?: INodeCreateElement[];
 	searchItems?: SimplifiedNodeType[];
 	forceIncludeNodes?: string[];
-	mode?: 'actions' | 'nodes' | 'community-node';
+	mode?: 'actions' | 'nodes';
 	hideActions?: boolean;
 	baseFilter?: (item: INodeCreateElement) => boolean;
 	itemsMapper?: (item: INodeCreateElement) => INodeCreateElement;
-	actionsFilter?: (items: ActionTypeDescription[]) => ActionTypeDescription[];
 	panelClass?: string;
 	sections?: string[] | NodeViewItemSection[];
-	communityNodeDetails?: CommunityNodeDetails;
 }
 
 export const useViewStacks = defineStore('nodeCreatorViewStacks', () => {
@@ -162,18 +152,12 @@ export const useViewStacks = defineStore('nodeCreatorViewStacks', () => {
 		return viewStacks.value[viewStacks.value.length - 1];
 	}
 
-	function getAllNodeCreateElements() {
-		return nodeCreatorStore.mergedNodes.map((item) =>
-			transformNodeType(item),
-		) as NodeCreateElement[];
-	}
-
 	// Generate a delta between the global search results(all nodes) and the stack search results
 	const globalSearchItemsDiff = computed<INodeCreateElement[]>(() => {
 		const stack = getLastActiveStack();
 		if (!stack?.search || isAiSubcategoryView(stack)) return [];
 
-		const allNodes = getAllNodeCreateElements();
+		const allNodes = nodeCreatorStore.mergedNodes.map((item) => transformNodeType(item));
 		// Apply filtering for AI nodes if the current view is not the AI root view
 		const filteredNodes = isAiRootView(stack) ? allNodes : filterOutAiNodes(allNodes);
 
@@ -223,10 +207,8 @@ export const useViewStacks = defineStore('nodeCreatorViewStacks', () => {
 		return items.filter((node) => {
 			if (node.type !== 'node') return false;
 
-			const subcategories = node.properties.codex?.subcategories?.[AI_SUBCATEGORY] ?? [];
-			return (
-				subcategories.includes(AI_CATEGORY_ROOT_NODES) &&
-				!subcategories?.includes(AI_CATEGORY_TOOLS)
+			return node.properties.codex?.subcategories?.[AI_SUBCATEGORY].includes(
+				AI_CATEGORY_ROOT_NODES,
 			);
 		});
 	}
@@ -241,17 +223,16 @@ export const useViewStacks = defineStore('nodeCreatorViewStacks', () => {
 			const aiSubNodes = difference(aiNodes, aiRootNodes);
 
 			aiSubNodes.forEach((node) => {
-				const subcategories = node.properties.codex?.subcategories ?? {};
-				const section = subcategories[AI_SUBCATEGORY]?.[0];
+				const section = node.properties.codex?.subcategories?.[AI_SUBCATEGORY]?.[0];
 
 				if (section) {
-					const subSection = subcategories[section]?.[0];
+					const subSection = node.properties.codex?.subcategories?.[section]?.[0];
 					const sectionKey = subSection ?? section;
 					const currentItems = sectionsMap.get(sectionKey)?.items ?? [];
-					const isSubnodesSection = !(
-						subcategories[AI_SUBCATEGORY].includes(AI_CATEGORY_ROOT_NODES) ||
-						subcategories[AI_SUBCATEGORY].includes(AI_CATEGORY_MCP_NODES)
-					);
+					const isSubnodesSection =
+						!node.properties.codex?.subcategories?.[AI_SUBCATEGORY].includes(
+							AI_CATEGORY_ROOT_NODES,
+						);
 
 					let title = section;
 					if (isSubnodesSection) {
@@ -331,57 +312,43 @@ export const useViewStacks = defineStore('nodeCreatorViewStacks', () => {
 		}
 
 		await nextTick();
-
-		const iconName = getThemedValue(relatedAIView?.properties.icon, useUIStore().appliedTheme);
-		pushViewStack(
-			{
-				title: relatedAIView?.properties.title,
-				...extendedInfo,
-				rootView: AI_OTHERS_NODE_CREATOR_VIEW,
-				mode: 'nodes',
-				items: nodeCreatorStore.allNodeCreatorNodes,
-				nodeIcon: iconName
-					? {
-							type: 'icon',
-							name: iconName,
-							color: relatedAIView?.properties.iconProps?.color,
-						}
-					: undefined,
-				panelClass: relatedAIView?.properties.panelClass,
-				baseFilter: (i: INodeCreateElement) => {
-					// AI Code node could have any connection type so we don't want to display it
-					// in the compatible connection view as it would be displayed in all of them
-					if (i.key === AI_CODE_NODE_TYPE) return false;
-					const displayNode = nodesByConnectionType[connectionType].includes(i.key);
-
-					// TODO: Filtering works currently fine for displaying compatible node when dropping
-					//       input connections. However, it does not work for output connections.
-					//       For that reason does it currently display nodes that are maybe not compatible
-					//       but then errors once it got selected by the user.
-					if (displayNode && filter?.nodes?.length) {
-						return filter.nodes.includes(i.key);
-					}
-
-					return displayNode;
-				},
-				itemsMapper(item) {
-					return {
-						...item,
-						subcategory: connectionType,
-					};
-				},
-				actionsFilter: (items: ActionTypeDescription[]) => {
-					// Filter out actions that are not compatible with the connection type
-					if (items.some((item) => item.outputConnectionType)) {
-						return items.filter((item) => item.outputConnectionType === connectionType);
-					}
-					return items;
-				},
-				hideActions: true,
-				preventBack: true,
+		pushViewStack({
+			title: relatedAIView?.properties.title,
+			...extendedInfo,
+			rootView: AI_OTHERS_NODE_CREATOR_VIEW,
+			mode: 'nodes',
+			items: nodeCreatorStore.allNodeCreatorNodes,
+			nodeIcon: {
+				iconType: 'icon',
+				icon: relatedAIView?.properties.icon,
+				color: relatedAIView?.properties.iconProps?.color,
 			},
-			{ resetStacks: true },
-		);
+			panelClass: relatedAIView?.properties.panelClass,
+			baseFilter: (i: INodeCreateElement) => {
+				// AI Code node could have any connection type so we don't want to display it
+				// in the compatible connection view as it would be displayed in all of them
+				if (i.key === AI_CODE_NODE_TYPE) return false;
+				const displayNode = nodesByConnectionType[connectionType].includes(i.key);
+
+				// TODO: Filtering works currently fine for displaying compatible node when dropping
+				//       input connections. However, it does not work for output connections.
+				//       For that reason does it currently display nodes that are maybe not compatible
+				//       but then errors once it got selected by the user.
+				if (displayNode && filter?.nodes?.length) {
+					return filter.nodes.includes(i.key);
+				}
+
+				return displayNode;
+			},
+			itemsMapper(item) {
+				return {
+					...item,
+					subcategory: connectionType,
+				};
+			},
+			hideActions: true,
+			preventBack: true,
+		});
 	}
 
 	function setStackBaselineItems() {
@@ -435,14 +402,14 @@ export const useViewStacks = defineStore('nodeCreatorViewStacks', () => {
 		updateCurrentViewStack({ baselineItems: stackItems });
 	}
 
-	function pushViewStack(
-		stack: ViewStack,
-		options: { resetStacks?: boolean; transitionDirection?: 'in' | 'out' | 'none' } = {},
-	) {
-		if (options.resetStacks) {
-			resetViewStacks();
-		}
+	function extendItemsWithUUID(items: INodeCreateElement[]) {
+		return items.map((item) => ({
+			...item,
+			uuid: `${item.key}-${uuid()}`,
+		}));
+	}
 
+	function pushViewStack(stack: ViewStack) {
 		if (activeViewStack.value.uuid) {
 			updateCurrentViewStack({ activeIndex: getActiveItemIndex() });
 		}
@@ -451,7 +418,7 @@ export const useViewStacks = defineStore('nodeCreatorViewStacks', () => {
 		viewStacks.value.push({
 			...stack,
 			uuid: newStackUuid,
-			transitionDirection: options.transitionDirection ?? 'in',
+			transitionDirection: 'in',
 			activeIndex: 0,
 		});
 		setStackBaselineItems();
@@ -494,6 +461,5 @@ export const useViewStacks = defineStore('nodeCreatorViewStacks', () => {
 		updateCurrentViewStack,
 		pushViewStack,
 		popViewStack,
-		getAllNodeCreateElements,
 	};
 });

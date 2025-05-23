@@ -12,7 +12,6 @@ const renderComponent = createComponentRenderer(WorkflowPreview);
 let pinia: ReturnType<typeof createPinia>;
 let executionsStore: ReturnType<typeof useExecutionsStore>;
 let postMessageSpy: Mock;
-let focusSpy: Mock;
 let consoleErrorSpy: MockInstance;
 
 const sendPostMessageCommand = (command: string) => {
@@ -27,12 +26,10 @@ describe('WorkflowPreview', () => {
 
 		consoleErrorSpy = vi.spyOn(console, 'error');
 		postMessageSpy = vi.fn();
-		focusSpy = vi.fn();
 		Object.defineProperty(HTMLIFrameElement.prototype, 'contentWindow', {
 			writable: true,
 			value: {
 				postMessage: postMessageSpy,
-				focus: focusSpy,
 			},
 		});
 	});
@@ -108,7 +105,6 @@ describe('WorkflowPreview', () => {
 				}),
 				'*',
 			);
-			expect(focusSpy).toHaveBeenCalled();
 		});
 	});
 

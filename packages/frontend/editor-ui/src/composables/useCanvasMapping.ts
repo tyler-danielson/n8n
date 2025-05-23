@@ -15,7 +15,6 @@ import type {
 	CanvasConnectionPort,
 	CanvasNode,
 	CanvasNodeAddNodesRender,
-	CanvasNodeAIPromptRender,
 	CanvasNodeData,
 	CanvasNodeDefaultRender,
 	CanvasNodeDefaultRenderLabelSize,
@@ -28,7 +27,7 @@ import {
 	mapLegacyConnectionsToCanvasConnections,
 	mapLegacyEndpointsToCanvasConnectionPort,
 	parseCanvasConnectionHandleString,
-} from '@/utils/canvasUtils';
+} from '@/utils/canvasUtilsV2';
 import type {
 	ExecutionStatus,
 	ExecutionSummary,
@@ -39,26 +38,17 @@ import type {
 	Workflow,
 } from 'n8n-workflow';
 import {
-	NodeConnectionTypes,
+	NodeConnectionType,
 	NodeHelpers,
 	SEND_AND_WAIT_OPERATION,
 	WAIT_INDEFINITELY,
 } from 'n8n-workflow';
 import type { INodeUi } from '@/Interface';
-import {
-	CUSTOM_API_CALL_KEY,
-	FORM_NODE_TYPE,
-	SIMULATE_NODE_TYPE,
-	SIMULATE_TRIGGER_NODE_TYPE,
-	STICKY_NODE_TYPE,
-	WAIT_NODE_TYPE,
-} from '@/constants';
+import { CUSTOM_API_CALL_KEY, FORM_NODE_TYPE, STICKY_NODE_TYPE, WAIT_NODE_TYPE } from '@/constants';
 import { sanitizeHtml } from '@/utils/htmlUtils';
 import { MarkerType } from '@vue-flow/core';
 import { useNodeHelpers } from './useNodeHelpers';
 import { getTriggerNodeServiceName } from '@/utils/nodeTypesUtils';
-import { useNodeDirtiness } from '@/composables/useNodeDirtiness';
-import { getNodeIconSource } from '../utils/nodeIcon';
 
 export function useCanvasMapping({
 	nodes,
@@ -73,7 +63,6 @@ export function useCanvasMapping({
 	const workflowsStore = useWorkflowsStore();
 	const nodeTypesStore = useNodeTypesStore();
 	const nodeHelpers = useNodeHelpers();
-	const { dirtinessByName } = useNodeDirtiness();
 
 	function createStickyNoteRenderType(node: INodeUi): CanvasNodeStickyNoteRender {
 		return {
@@ -93,21 +82,8 @@ export function useCanvasMapping({
 			options: {},
 		};
 	}
-	function createAIPromptRenderType(): CanvasNodeAIPromptRender {
-		return {
-			type: CanvasNodeRenderType.AIPrompt,
-			options: {},
-		};
-	}
 
 	function createDefaultNodeRenderType(node: INodeUi): CanvasNodeDefaultRender {
-		const nodeType = nodeTypeDescriptionByNodeId.value[node.id];
-		const icon = getNodeIconSource(
-			simulatedNodeTypeDescriptionByNodeId.value[node.id]
-				? simulatedNodeTypeDescriptionByNodeId.value[node.id]
-				: nodeType,
-		);
-
 		return {
 			type: CanvasNodeRenderType.Default,
 			options: {
@@ -121,8 +97,6 @@ export function useCanvasMapping({
 					labelSize: nodeOutputLabelSizeById.value[node.id],
 				},
 				tooltip: nodeTooltipById.value[node.id],
-				dirtiness: dirtinessByName.value[node.name],
-				icon,
 			},
 		};
 	}
@@ -136,9 +110,6 @@ export function useCanvasMapping({
 						break;
 					case `${CanvasNodeRenderType.AddNodes}`:
 						acc[node.id] = createAddNodesRenderType();
-						break;
-					case `${CanvasNodeRenderType.AIPrompt}`:
-						acc[node.id] = createAIPromptRenderType();
 						break;
 					default:
 						acc[node.id] = createDefaultNodeRenderType(node);
@@ -160,6 +131,16 @@ export function useCanvasMapping({
 			acc[node.id] = nodeTypesStore.isTriggerNode(node.type);
 			return acc;
 		}, {}),
+	);
+
+	const activeTriggerNodeCount = computed(
+		() =>
+			nodes.value.filter(
+				(node) =>
+					nodeTypeDescriptionByNodeId.value[node.id]?.eventTriggerDescription !== '' &&
+					isTriggerNodeById.value[node.id] &&
+					!node.disabled,
+			).length,
 	);
 
 	const nodeSubtitleById = computed(() => {
@@ -220,7 +201,7 @@ export function useCanvasMapping({
 		const labelSizes: CanvasNodeDefaultRenderLabelSize[] = ['small', 'medium', 'large'];
 		const labelSizeIndexes = ports.reduce<number[]>(
 			(sizeAcc, input) => {
-				if (input.type === NodeConnectionTypes.Main) {
+				if (input.type === NodeConnectionType.Main) {
 					sizeAcc.push(getLabelSize(input.label ?? ''));
 				}
 
@@ -274,28 +255,13 @@ export function useCanvasMapping({
 		}, {}),
 	);
 
-	const nodeTooltipById = computed(() => {
-		if (!workflowsStore.isWorkflowRunning) {
-			return {};
-		}
-
-		const activeTriggerNodeCount = nodes.value.filter(
-			(node) => isTriggerNodeById.value[node.id] && !node.disabled,
-		).length;
-		const triggerNodeName = workflowsStore.getWorkflowExecution?.triggerNode;
-
-		// For workflows with multiple active trigger nodes, we show a tooltip only when
-		// trigger node name is known
-		if (triggerNodeName === undefined && activeTriggerNodeCount !== 1) {
-			return {};
-		}
-
-		return nodes.value.reduce<Record<string, string | undefined>>((acc, node) => {
+	const nodeTooltipById = computed(() =>
+		nodes.value.reduce<Record<string, string | undefined>>((acc, node) => {
 			const nodeTypeDescription = nodeTypeDescriptionByNodeId.value[node.id];
 			if (nodeTypeDescription && isTriggerNodeById.value[node.id]) {
 				if (
-					!!node.disabled ||
-					(triggerNodeName !== undefined && triggerNodeName !== node.name) ||
+					activeTriggerNodeCount.value !== 1 ||
+					!workflowsStore.isWorkflowRunning ||
 					!['new', 'unknown', 'waiting'].includes(nodeExecutionStatusById.value[node.id])
 				) {
 					return acc;
@@ -317,8 +283,8 @@ export function useCanvasMapping({
 			}
 
 			return acc;
-		}, {});
-	});
+		}, {}),
+	);
 
 	const nodeExecutionRunningById = computed(() =>
 		nodes.value.reduce<Record<string, boolean>>((acc, node) => {
@@ -391,7 +357,7 @@ export function useCanvasMapping({
 			}
 
 			if (node?.issues !== undefined) {
-				issues.push(...nodeHelpers.nodeIssuesToString(node.issues, node));
+				issues.push(...NodeHelpers.nodeIssuesToString(node.issues, node));
 			}
 
 			acc[node.id] = issues;
@@ -534,26 +500,6 @@ export function useCanvasMapping({
 			},
 			{},
 		);
-	});
-
-	const simulatedNodeTypeDescriptionByNodeId = computed(() => {
-		return nodes.value.reduce<Record<string, INodeTypeDescription | null>>((acc, node) => {
-			if ([SIMULATE_NODE_TYPE, SIMULATE_TRIGGER_NODE_TYPE].includes(node.type)) {
-				const icon = node.parameters?.icon as string;
-				const iconValue = workflowObject.value.expression.getSimpleParameterValue(
-					node,
-					icon,
-					'internal',
-					{},
-				);
-
-				if (iconValue && typeof iconValue === 'string') {
-					acc[node.id] = nodeTypesStore.getNodeType(iconValue);
-				}
-			}
-
-			return acc;
-		}, {});
 	});
 
 	const mappedNodes = computed<CanvasNode[]>(() => [

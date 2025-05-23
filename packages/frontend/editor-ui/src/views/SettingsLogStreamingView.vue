@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { computed, nextTick, onBeforeMount, onMounted, ref, getCurrentInstance } from 'vue';
+import { computed, nextTick, onBeforeMount, onMounted } from 'vue';
 import { v4 as uuid } from 'uuid';
 import { useWorkflowsStore } from '@/stores/workflows.store';
 import { hasPermission } from '@/utils/rbac/permissions';
@@ -11,8 +11,9 @@ import { LOG_STREAM_MODAL_KEY, EnterpriseEditionFeature } from '@/constants';
 import type { MessageEventBusDestinationOptions } from 'n8n-workflow';
 import { deepCopy, defaultMessageEventBusDestinationOptions } from 'n8n-workflow';
 import EventDestinationCard from '@/components/SettingsLogStreaming/EventDestinationCard.ee.vue';
-import { createEventBus } from '@n8n/utils/event-bus';
+import { createEventBus } from 'n8n-design-system/utils';
 import { useDocumentTitle } from '@/composables/useDocumentTitle';
+import { ref, getCurrentInstance } from 'vue';
 import { useI18n } from '@/composables/useI18n';
 import { usePageRedirectionHelper } from '@/composables/usePageRedirectionHelper';
 
@@ -174,7 +175,7 @@ async function onEdit(destinationId?: string) {
 					{{ i18n.baseText(`settings.log-streaming.heading`) }}
 				</n8n-heading>
 				<template v-if="environment !== 'production'">
-					<span class="ml-m">Disable License ({{ environment }})&nbsp;</span>
+					<strong class="ml-m">Disable License ({{ environment }})&nbsp;</strong>
 					<el-switch v-model="disableLicense" size="large" data-test-id="disable-license-toggle" />
 				</template>
 			</div>

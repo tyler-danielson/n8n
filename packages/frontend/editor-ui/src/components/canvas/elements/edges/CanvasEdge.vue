@@ -4,8 +4,8 @@ import type { CanvasConnectionData } from '@/types';
 import { isValidNodeConnectionType } from '@/utils/typeGuards';
 import type { Connection, EdgeProps } from '@vue-flow/core';
 import { BaseEdge, EdgeLabelRenderer } from '@vue-flow/core';
-import { NodeConnectionTypes } from 'n8n-workflow';
-import { computed, ref, toRef, useCssModule, watch } from 'vue';
+import { NodeConnectionType } from 'n8n-workflow';
+import { computed, useCssModule, toRef } from 'vue';
 import CanvasEdgeToolbar from './CanvasEdgeToolbar.vue';
 import { getEdgeRenderData } from './utils';
 
@@ -30,31 +30,12 @@ const $style = useCssModule();
 const connectionType = computed(() =>
 	isValidNodeConnectionType(props.data.source.type)
 		? props.data.source.type
-		: NodeConnectionTypes.Main,
+		: NodeConnectionType.Main,
 );
 
-const delayedHovered = ref(props.hovered);
-const delayedHoveredSetTimeoutRef = ref<NodeJS.Timeout | null>(null);
-const delayedHoveredTimeout = 600;
+const renderToolbar = computed(() => props.hovered && !props.readOnly);
 
-watch(
-	() => props.hovered,
-	(isHovered) => {
-		if (isHovered) {
-			if (delayedHoveredSetTimeoutRef.value) clearTimeout(delayedHoveredSetTimeoutRef.value);
-			delayedHovered.value = true;
-		} else {
-			delayedHoveredSetTimeoutRef.value = setTimeout(() => {
-				delayedHovered.value = false;
-			}, delayedHoveredTimeout);
-		}
-	},
-	{ immediate: true },
-);
-
-const renderToolbar = computed(() => (props.selected || delayedHovered.value) && !props.readOnly);
-
-const isMainConnection = computed(() => data.value.source.type === NodeConnectionTypes.Main);
+const isMainConnection = computed(() => data.value.source.type === NodeConnectionType.Main);
 
 const status = computed(() => props.data.status);
 
@@ -76,26 +57,25 @@ const edgeStyle = computed(() => ({
 	...props.style,
 	...(isMainConnection.value ? {} : { strokeDasharray: '8,8' }),
 	strokeWidth: 2,
-	stroke: delayedHovered.value ? 'var(--color-primary)' : edgeColor.value,
+	stroke: props.hovered ? 'var(--color-primary)' : edgeColor.value,
 }));
 
 const edgeClasses = computed(() => ({
 	[$style.edge]: true,
-	hovered: delayedHovered.value,
+	hovered: props.hovered,
 	'bring-to-front': props.bringToFront,
 }));
 
 const edgeLabelStyle = computed(() => ({
-	transform: `translate(0, ${isConnectorStraight.value ? '-100%' : '0%'})`,
-	color: 'var(--color-text-base)',
+	color: edgeColor.value,
 }));
 
-const isConnectorStraight = computed(() => renderData.value.isConnectorStraight);
-
-const edgeToolbarStyle = computed(() => ({
-	transform: `translate(-50%, -50%) translate(${labelPosition.value[0]}px, ${labelPosition.value[1]}px)`,
-	...(delayedHovered.value ? { zIndex: 1 } : {}),
-}));
+const edgeToolbarStyle = computed(() => {
+	return {
+		transform: `translate(-50%, -50%) translate(${labelPosition.value[0]}px,${labelPosition.value[1]}px)`,
+		...(props.hovered ? { zIndex: 1 } : {}),
+	};
+});
 
 const edgeToolbarClasses = computed(() => ({
 	[$style.edgeLabelWrapper]: true,
@@ -138,28 +118,22 @@ function onEdgeLabelMouseLeave() {
 </script>
 
 <template>
-	<g
-		data-test-id="edge"
-		:data-source-node-name="data.source?.node"
-		:data-target-node-name="data.target?.node"
-	>
-		<BaseEdge
-			v-for="(segment, index) in segments"
-			:id="`${id}-${index}`"
-			:key="segment[0]"
-			:class="edgeClasses"
-			:style="edgeStyle"
-			:path="segment[0]"
-			:marker-end="markerEnd"
-			:interaction-width="40"
-		/>
-	</g>
+	<BaseEdge
+		v-for="(segment, index) in segments"
+		:id="`${id}-${index}`"
+		:key="segment[0]"
+		:class="edgeClasses"
+		:style="edgeStyle"
+		:path="segment[0]"
+		:marker-end="markerEnd"
+		:interaction-width="40"
+	/>
 
 	<EdgeLabelRenderer>
 		<div
-			data-test-id="edge-label"
-			:data-source-node-name="data.source?.node"
-			:data-target-node-name="data.target?.node"
+			data-test-id="edge-label-wrapper"
+			:data-source-node-name="sourceNode?.label"
+			:data-target-node-name="targetNode?.label"
 			:data-edge-status="status"
 			:style="edgeToolbarStyle"
 			:class="edgeToolbarClasses"

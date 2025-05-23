@@ -3,8 +3,8 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { onClickOutside } from '@vueuse/core';
 import type { ITag } from '@/Interface';
 import { MAX_TAG_NAME_LENGTH } from '@/constants';
-import { N8nOption, N8nSelect } from '@n8n/design-system';
-import type { EventBus } from '@n8n/utils/event-bus';
+import { N8nOption, N8nSelect } from 'n8n-design-system';
+import type { EventBus } from 'n8n-design-system';
 import { useI18n } from '@/composables/useI18n';
 import { v4 as uuid } from 'uuid';
 import { useToast } from '@/composables/useToast';
@@ -16,10 +16,7 @@ interface TagsDropdownProps {
 	allTags: ITag[];
 	isLoading: boolean;
 	tagsById: Record<string, ITag>;
-	createEnabled?: boolean;
-	manageEnabled?: boolean;
 	createTag?: (name: string) => Promise<ITag>;
-	multipleLimit?: number;
 }
 
 const i18n = useI18n();
@@ -30,10 +27,6 @@ const props = withDefaults(defineProps<TagsDropdownProps>(), {
 	placeholder: '',
 	modelValue: () => [],
 	eventBus: null,
-	createEnabled: true,
-	manageEnabled: true,
-	createTag: undefined,
-	multipleLimit: 0,
 });
 
 const emit = defineEmits<{
@@ -65,17 +58,6 @@ const options = computed<ITag[]>(() => {
 const appliedTags = computed<string[]>(() => {
 	return props.modelValue.filter((id: string) => props.tagsById[id]);
 });
-
-const containerClasses = computed(() => {
-	return { 'tags-container': true, focused: focused.value };
-});
-
-const dropdownClasses = computed(() => ({
-	'tags-dropdown': true,
-	[`tags-dropdown-${dropdownId}`]: true,
-	'tags-dropdown-create-enabled': props.createEnabled,
-	'tags-dropdown-manage-enabled': props.manageEnabled,
-}));
 
 watch(
 	() => props.allTags,
@@ -207,7 +189,7 @@ onClickOutside(
 </script>
 
 <template>
-	<div ref="container" :class="containerClasses" @keydown.stop>
+	<div ref="container" :class="{ 'tags-container': true, focused }" @keydown.stop>
 		<N8nSelect
 			ref="selectRef"
 			:teleported="true"
@@ -217,17 +199,16 @@ onClickOutside(
 			:filter-method="filterOptions"
 			filterable
 			multiple
-			:multiple-limit="props.multipleLimit"
 			:reserve-keyword="false"
 			loading-text="..."
-			:popper-class="dropdownClasses"
+			:popper-class="['tags-dropdown', 'tags-dropdown-' + dropdownId].join(' ')"
 			data-test-id="tags-dropdown"
 			@update:model-value="onTagsUpdated"
 			@visible-change="onVisibleChange"
 			@remove-tag="onRemoveTag"
 		>
 			<N8nOption
-				v-if="createEnabled && options.length === 0 && filter"
+				v-if="options.length === 0 && filter"
 				:key="CREATE_KEY"
 				ref="createRef"
 				:value="CREATE_KEY"
@@ -239,11 +220,11 @@ onClickOutside(
 				</span>
 			</N8nOption>
 			<N8nOption v-else-if="options.length === 0" value="message" disabled>
-				<span v-if="createEnabled">{{ i18n.baseText('tagsDropdown.typeToCreateATag') }}</span>
-				<span v-else-if="allTags.length > 0">{{
+				<span>{{ i18n.baseText('tagsDropdown.typeToCreateATag') }}</span>
+				<span v-if="allTags.length > 0">{{
 					i18n.baseText('tagsDropdown.noMatchingTagsExist')
 				}}</span>
-				<span v-else>{{ i18n.baseText('tagsDropdown.noTagsExist') }}</span>
+				<span v-else-if="filter">{{ i18n.baseText('tagsDropdown.noTagsExist') }}</span>
 			</N8nOption>
 
 			<N8nOption
@@ -256,7 +237,7 @@ onClickOutside(
 				data-test-id="tag"
 			/>
 
-			<N8nOption v-if="manageEnabled" :key="MANAGE_KEY" :value="MANAGE_KEY" class="ops manage-tags">
+			<N8nOption :key="MANAGE_KEY" :value="MANAGE_KEY" class="ops manage-tags">
 				<font-awesome-icon icon="cog" />
 				<span>{{ i18n.baseText('tagsDropdown.manageTags') }}</span>
 			</N8nOption>
@@ -282,7 +263,7 @@ onClickOutside(
 
 	.el-tag {
 		padding: var(--spacing-5xs) var(--spacing-4xs);
-		color: var(--color-text-base);
+		color: var(--color-text-dark);
 		background-color: var(--color-background-base);
 		border-radius: var(--border-radius-base);
 		font-size: var(--font-size-2xs);
@@ -332,7 +313,7 @@ onClickOutside(
 			}
 		}
 
-		.tags-dropdown-manage-enabled &:after {
+		&:after {
 			content: ' ';
 			display: block;
 			min-height: $--item-height;
@@ -352,7 +333,7 @@ onClickOutside(
 		padding: $--item-padding;
 		margin: 0;
 		line-height: $--item-line-height;
-		font-weight: var(--font-weight-regular);
+		font-weight: 400;
 		font-size: $--item-font-size;
 
 		&.is-disabled {
@@ -361,7 +342,7 @@ onClickOutside(
 		}
 
 		&.selected {
-			font-weight: var(--font-weight-bold);
+			font-weight: bold;
 
 			> span {
 				display: inline-block;

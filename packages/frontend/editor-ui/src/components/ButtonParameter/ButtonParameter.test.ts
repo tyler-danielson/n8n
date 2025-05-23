@@ -2,11 +2,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { createTestingPinia } from '@pinia/testing';
-import ButtonParameter, { type Props } from '@/components/ButtonParameter/ButtonParameter.vue';
+import ButtonParameter from '@/components/ButtonParameter/ButtonParameter.vue';
 import { useNDVStore } from '@/stores/ndv.store';
 import { useWorkflowsStore } from '@/stores/workflows.store';
 import { usePostHog } from '@/stores/posthog.store';
-import { useRootStore } from '@n8n/stores/useRootStore';
+import { useRootStore } from '@/stores/root.store';
 import { useI18n } from '@/composables/useI18n';
 import { useToast } from '@/composables/useToast';
 import type { INodeProperties } from 'n8n-workflow';
@@ -14,13 +14,13 @@ import type { INodeProperties } from 'n8n-workflow';
 vi.mock('@/stores/ndv.store');
 vi.mock('@/stores/workflows.store');
 vi.mock('@/stores/posthog.store');
-vi.mock('@n8n/stores/useRootStore');
+vi.mock('@/stores/root.store');
 vi.mock('@/api/ai');
 vi.mock('@/composables/useI18n');
 vi.mock('@/composables/useToast');
 
 describe('ButtonParameter', () => {
-	const defaultProps: Props = {
+	const defaultProps = {
 		parameter: {
 			name: 'testParam',
 			displayName: 'Test Parameter',
@@ -38,7 +38,6 @@ describe('ButtonParameter', () => {
 			},
 		} as INodeProperties,
 		value: '',
-		isReadOnly: false,
 		path: 'testPath',
 	};
 
@@ -79,9 +78,9 @@ describe('ButtonParameter', () => {
 		} as any);
 	});
 
-	const mountComponent = (props: Partial<Props> = {}) => {
+	const mountComponent = (props = defaultProps) => {
 		return mount(ButtonParameter, {
-			props: { ...defaultProps, ...props },
+			props,
 			global: {
 				plugins: [createTestingPinia()],
 			},
@@ -134,11 +133,5 @@ describe('ButtonParameter', () => {
 		await submitButton.trigger('click');
 
 		expect(useToast().showMessage).toHaveBeenCalled();
-	});
-
-	it('disables input and button when in read only mode', async () => {
-		const wrapper = mountComponent({ isReadOnly: true });
-		expect(wrapper.find('textarea').attributes('disabled')).toBeDefined();
-		expect(wrapper.find('button').attributes('disabled')).toBeDefined();
 	});
 });

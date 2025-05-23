@@ -1,89 +1,78 @@
-import { nextTick, reactive } from 'vue';
-import { createTestingPinia } from '@pinia/testing';
-import type { MockInstance } from 'vitest';
-import { within, waitFor } from '@testing-library/vue';
-import userEvent from '@testing-library/user-event';
-import type { FrontendSettings } from '@n8n/api-types';
-import { createComponentRenderer } from '@/__tests__/render';
-import { getDropdownItems, mockedStore, type MockedStore } from '@/__tests__/utils';
-import { EnterpriseEditionFeature } from '@/constants';
+import { createPinia, setActivePinia } from 'pinia';
 import WorkflowSettingsVue from '@/components/WorkflowSettings.vue';
+
+import { setupServer } from '@/__tests__/server';
+import { afterAll, beforeAll } from 'vitest';
+import { within } from '@testing-library/vue';
+import userEvent from '@testing-library/user-event';
+
 import { useWorkflowsStore } from '@/stores/workflows.store';
 import { useSettingsStore } from '@/stores/settings.store';
-import { useSourceControlStore } from '@/stores/sourceControl.store';
+import { useUIStore } from '@/stores/ui.store';
 
-vi.mock('vue-router', async () => ({
-	useRouter: vi.fn(),
-	useRoute: () =>
-		reactive({
-			params: {
-				name: '1',
-			},
-		}),
-	RouterLink: {
-		template: '<a><slot /></a>',
-	},
-}));
+import { createComponentRenderer } from '@/__tests__/render';
+import { cleanupAppModals, createAppModals, getDropdownItems } from '@/__tests__/utils';
+import { EnterpriseEditionFeature, WORKFLOW_SETTINGS_MODAL_KEY } from '@/constants';
 
-let workflowsStore: MockedStore<typeof useWorkflowsStore>;
-let settingsStore: MockedStore<typeof useSettingsStore>;
-let sourceControlStore: MockedStore<typeof useSourceControlStore>;
-let pinia: ReturnType<typeof createTestingPinia>;
+import { nextTick } from 'vue';
+import type { IWorkflowDb } from '@/Interface';
+import * as permissions from '@/permissions';
+import type { PermissionsRecord } from '@/permissions';
 
-let fetchAllWorkflowsSpy: MockInstance<(typeof workflowsStore)['fetchAllWorkflows']>;
+let pinia: ReturnType<typeof createPinia>;
+let workflowsStore: ReturnType<typeof useWorkflowsStore>;
+let settingsStore: ReturnType<typeof useSettingsStore>;
+let uiStore: ReturnType<typeof useUIStore>;
 
-const createComponent = createComponentRenderer(WorkflowSettingsVue, {
-	global: {
-		stubs: {
-			Modal: {
-				template:
-					'<div role="dialog"><slot name="header" /><slot name="content" /><slot name="footer" /></div>',
-			},
-		},
-	},
-});
+const createComponent = createComponentRenderer(WorkflowSettingsVue);
 
 describe('WorkflowSettingsVue', () => {
-	beforeEach(async () => {
-		pinia = createTestingPinia();
-		workflowsStore = mockedStore(useWorkflowsStore);
-		settingsStore = mockedStore(useSettingsStore);
-		sourceControlStore = mockedStore(useSourceControlStore);
+	let server: ReturnType<typeof setupServer>;
+	beforeAll(() => {
+		server = setupServer();
+	});
 
-		settingsStore.settings = {
-			enterprise: {},
-		} as FrontendSettings;
-		workflowsStore.workflowName = 'Test Workflow';
-		workflowsStore.workflowId = '1';
-		fetchAllWorkflowsSpy = workflowsStore.fetchAllWorkflows.mockResolvedValue([
-			{
-				id: '1',
-				name: 'Test Workflow',
-				active: true,
-				isArchived: false,
-				nodes: [],
-				connections: {},
-				createdAt: 1,
-				updatedAt: 1,
-				versionId: '123',
-			},
-		]);
-		workflowsStore.getWorkflowById.mockImplementation(() => ({
+	beforeEach(async () => {
+		pinia = createPinia();
+		setActivePinia(pinia);
+
+		createAppModals();
+
+		workflowsStore = useWorkflowsStore();
+		settingsStore = useSettingsStore();
+		uiStore = useUIStore();
+
+		await settingsStore.getSettings();
+
+		vi.spyOn(workflowsStore, 'workflowName', 'get').mockReturnValue('Test Workflow');
+		vi.spyOn(workflowsStore, 'workflowId', 'get').mockReturnValue('1');
+		vi.spyOn(workflowsStore, 'getWorkflowById').mockReturnValue({
 			id: '1',
 			name: 'Test Workflow',
 			active: true,
-			isArchived: false,
 			nodes: [],
 			connections: {},
 			createdAt: 1,
 			updatedAt: 1,
 			versionId: '123',
-			scopes: ['workflow:update'],
-		}));
+		} as IWorkflowDb);
+		vi.spyOn(permissions, 'getResourcePermissions').mockReturnValue({
+			workflow: {
+				update: true,
+			},
+		} as PermissionsRecord);
+
+		uiStore.modalsById[WORKFLOW_SETTINGS_MODAL_KEY] = {
+			open: true,
+		};
 	});
 
 	afterEach(() => {
-		vi.clearAllMocks();
+		cleanupAppModals();
+	});
+
+	afterAll(() => {
+		server.shutdown();
 	});
 
 	it('should render correctly', async () => {
@@ -122,20 +111,6 @@ describe('WorkflowSettingsVue', () => {
 		await userEvent.click(dropdownItems[2]);
 
 		expect(getByTestId('workflow-caller-policy-workflow-ids')).toBeVisible();
-	});
-
-	it('should fetch all workflows and render them in the error workflows dropdown', async () => {
-		settingsStore.settings.enterprise[EnterpriseEditionFeature.Sharing] = true;
-		const { getByTestId } = createComponent({ pinia });
-
-		await nextTick();
-		const dropdownItems = await getDropdownItems(getByTestId('error-workflow'));
-
-		// first is `- No Workflow -`, second is the workflow returned by
-		// `workflowsStore.fetchAllWorkflows`
-		expect(dropdownItems).toHaveLength(2);
-		expect(fetchAllWorkflowsSpy).toHaveBeenCalledTimes(1);
-		expect(fetchAllWorkflowsSpy).toHaveBeenCalledWith();
 	});
 
 	it('should not remove valid workflow ID characters', async () => {
@@ -216,80 +191,4 @@ describe('WorkflowSettingsVue', () => {
 			expect(dropdownItems[0]).toHaveTextContent(optionText);
 		},
 	);
-
-	it('should save time saved per execution correctly', async () => {
-		const { getByTestId, getByRole } = createComponent({ pinia });
-		await nextTick();
-
-		const timeSavedPerExecutionInput = getByTestId('workflow-settings-time-saved-per-execution');
-
-		expect(timeSavedPerExecutionInput).toBeVisible();
-
-		await userEvent.type(timeSavedPerExecutionInput as Element, '10');
-		expect(timeSavedPerExecutionInput).toHaveValue(10);
-
-		await userEvent.click(getByRole('button', { name: 'Save' }));
-		expect(workflowsStore.updateWorkflow).toHaveBeenCalledWith(
-			expect.any(String),
-			expect.objectContaining({ settings: expect.objectContaining({ timeSavedPerExecution: 10 }) }),
-		);
-	});
-
-	it('should remove time saved per execution setting', async () => {
-		workflowsStore.workflowSettings.timeSavedPerExecution = 10;
-
-		const { getByTestId, getByRole } = createComponent({ pinia });
-		await nextTick();
-
-		const timeSavedPerExecutionInput = getByTestId('workflow-settings-time-saved-per-execution');
-
-		expect(timeSavedPerExecutionInput).toBeVisible();
-		await waitFor(() => expect(timeSavedPerExecutionInput).toHaveValue(10));
-
-		await userEvent.clear(timeSavedPerExecutionInput as Element);
-		expect(timeSavedPerExecutionInput).not.toHaveValue();
-
-		await userEvent.click(getByRole('button', { name: 'Save' }));
-		expect(workflowsStore.updateWorkflow).toHaveBeenCalledWith(
-			expect.any(String),
-			expect.objectContaining({
-				settings: expect.not.objectContaining({ timeSavedPerExecution: 10 }),
-			}),
-		);
-	});
-
-	it('should disable save time saved per execution if env is read-only', async () => {
-		sourceControlStore.preferences.branchReadOnly = true;
-
-		const { getByTestId } = createComponent({ pinia });
-		await nextTick();
-
-		const timeSavedPerExecutionInput = getByTestId('workflow-settings-time-saved-per-execution');
-
-		expect(timeSavedPerExecutionInput).toBeVisible();
-		expect(timeSavedPerExecutionInput).toBeDisabled();
-	});
-
-	it('should disable save time saved per execution if user has no permission to update workflow', async () => {
-		workflowsStore.getWorkflowById.mockImplementation(() => ({
-			id: '1',
-			name: 'Test Workflow',
-			active: true,
-			isArchived: false,
-			nodes: [],
-			connections: {},
-			createdAt: 1,
-			updatedAt: 1,
-			versionId: '123',
-			scopes: ['workflow:read'],
-		}));
-
-		const { getByTestId } = createComponent({ pinia });
-		await nextTick();
-
-		const timeSavedPerExecutionInput = getByTestId('workflow-settings-time-saved-per-execution');
-
-		expect(timeSavedPerExecutionInput).toBeVisible();
-		expect(timeSavedPerExecutionInput).toBeDisabled();
-	});
 });

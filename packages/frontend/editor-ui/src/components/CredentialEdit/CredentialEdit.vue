@@ -37,9 +37,9 @@ import { useSettingsStore } from '@/stores/settings.store';
 import { useUIStore } from '@/stores/ui.store';
 import { useWorkflowsStore } from '@/stores/workflows.store';
 import type { Project, ProjectSharingData } from '@/types/projects.types';
-import type { IMenuItem } from '@n8n/design-system';
-import { assert } from '@n8n/utils/assert';
-import { createEventBus } from '@n8n/utils/event-bus';
+import { assert } from '@/utils/assert';
+import type { IMenuItem } from 'n8n-design-system';
+import { createEventBus } from 'n8n-design-system/utils';
 
 import { useExternalHooks } from '@/composables/useExternalHooks';
 import { useI18n } from '@/composables/useI18n';
@@ -170,10 +170,11 @@ const isCredentialTestable = computed(() => {
 		return false;
 	}
 
-	const hasUntestableExpressions = credentialProperties.value.some((prop) => {
-		const value = credentialData.value[prop.name];
-		return typeof value === 'string' && isExpression(value) && !isTestableExpression(value);
-	});
+	const hasUntestableExpressions = Object.values(credentialData.value).reduce(
+		(accu: boolean, value: CredentialInformation) =>
+			accu || (typeof value === 'string' && isExpression(value) && !isTestableExpression(value)),
+		false,
+	);
 	if (hasUntestableExpressions) {
 		return false;
 	}
@@ -476,19 +477,6 @@ function getCredentialProperties(name: string): INodeProperties[] {
 	return combineProperties;
 }
 
-/**
- *
- * We might get credential with empty parameters from source-control
- * which breaks our types and Fe checks
- */
-function removePropertiesWithEmptyStrings<T extends { [key: string]: unknown }>(data: T): T {
-	const copy = structuredClone(data);
-	Object.entries(copy).forEach(([key, value]) => {
-		if (value === '') delete copy[key];
-	});
-	return copy;
-}
-
 async function loadCurrentCredential() {
 	credentialId.value = props.activeId ?? '';
 
@@ -507,10 +495,7 @@ async function loadCurrentCredential() {
 
 		currentCredential.value = currentCredentials;
 
-		credentialData.value = removePropertiesWithEmptyStrings(
-			(currentCredentials.data as ICredentialDataDecryptedObject) || {},
-		);
-
+		credentialData.value = (currentCredentials.data as ICredentialDataDecryptedObject) || {};
 		if (currentCredentials.sharedWithProjects) {
 			credentialData.value = {
 				...credentialData.value,
@@ -677,7 +662,6 @@ async function saveCredential(): Promise<ICredentialsResponse | null> {
 		credentialData.value as INodeParameters,
 		false,
 		false,
-		null,
 		null,
 	);
 
@@ -1122,7 +1106,7 @@ function resetCredentialData(): void {
 		</template>
 		<template #content>
 			<div :class="$style.container" data-test-id="credential-edit-dialog">
-				<div v-if="!isEditingManagedCredential" :class="$style.sidebar">
+				<div :class="$style.sidebar">
 					<n8n-menu
 						mode="tabs"
 						:items="sidebarItems"

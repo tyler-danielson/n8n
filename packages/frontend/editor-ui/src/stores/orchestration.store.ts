@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import type { WorkerStatus } from '@n8n/api-types';
 
-import { useRootStore } from '@n8n/stores/useRootStore';
+import { useRootStore } from './root.store';
 import { sendGetWorkerStatus } from '../api/orchestration';
 
 export const WORKER_HISTORY_LENGTH = 100;

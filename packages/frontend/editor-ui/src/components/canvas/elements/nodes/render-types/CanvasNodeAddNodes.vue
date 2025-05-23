@@ -43,7 +43,7 @@ function onClick() {
 			:popper-class="$style.tooltip"
 			:show-after="700"
 		>
-			<button :class="$style.button" data-test-id="canvas-plus-button" @click.stop="onClick">
+			<button :class="$style.button" data-test-id="canvas-plus-button" @click="onClick">
 				<FontAwesomeIcon icon="plus" size="lg" />
 			</button>
 			<template #content>
@@ -89,7 +89,7 @@ function onClick() {
 
 .label {
 	width: max-content;
-	font-weight: var(--font-weight-medium);
+	font-weight: var(--font-weight-bold);
 	font-size: var(--font-size-m);
 	line-height: var(--font-line-height-xloose);
 	color: var(--color-text-dark);

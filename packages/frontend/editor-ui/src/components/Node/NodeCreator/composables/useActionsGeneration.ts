@@ -1,12 +1,5 @@
 import type { ActionTypeDescription, ActionsRecord, SimplifiedNodeType } from '@/Interface';
-import {
-	AI_CATEGORY_ROOT_NODES,
-	AI_CATEGORY_TOOLS,
-	AI_SUBCATEGORY,
-	CUSTOM_API_CALL_KEY,
-	EVALUATION_TRIGGER,
-	HTTP_REQUEST_NODE_TYPE,
-} from '@/constants';
+import { AI_SUBCATEGORY, CUSTOM_API_CALL_KEY, HTTP_REQUEST_NODE_TYPE } from '@/constants';
 import { memoize, startCase } from 'lodash-es';
 import type {
 	ICredentialType,
@@ -20,7 +13,6 @@ import { i18n } from '@/plugins/i18n';
 
 import { getCredentialOnlyNodeType } from '@/utils/credentialOnlyNodes';
 import { formatTriggerActionName } from '../utils';
-import { usePostHog } from '@/stores/posthog.store';
 
 const PLACEHOLDER_RECOMMENDED_ACTION_KEY = 'placeholder_recommended';
 
@@ -95,7 +87,6 @@ function operationsCategory(nodeTypeDescription: INodeTypeDescription): ActionTy
 		displayName: item.action ?? startCase(item.name),
 		description: item.description ?? '',
 		displayOptions: matchedProperty.displayOptions,
-		outputConnectionType: item.outputConnectionType,
 		values: {
 			[matchedProperty.name]: matchedProperty.type === 'multiOptions' ? [item.value] : item.value,
 		},
@@ -126,7 +117,6 @@ function modeCategory(nodeTypeDescription: INodeTypeDescription): ActionTypeDesc
 		displayName: item.action ?? startCase(item.name),
 		description: item.description ?? '',
 		displayOptions: matchedProperty.displayOptions,
-		outputConnectionType: item.outputConnectionType,
 		values: {
 			[matchedProperty.name]: item.value,
 		},
@@ -195,7 +185,7 @@ function triggersCategory(nodeTypeDescription: INodeTypeDescription): ActionType
 function resourceCategories(nodeTypeDescription: INodeTypeDescription): ActionTypeDescription[] {
 	const transformedNodes: ActionTypeDescription[] = [];
 	const matchedProperties = nodeTypeDescription.properties.filter(
-		(property) => property.name === 'resource',
+		(property) => property.displayName?.toLowerCase() === 'resource',
 	);
 
 	matchedProperties.forEach((property) => {
@@ -257,7 +247,7 @@ function resourceCategories(nodeTypeDescription: INodeTypeDescription): ActionTy
 							},
 							displayName,
 							group: ['trigger'],
-						} as ActionTypeDescription;
+						};
 					},
 				);
 
@@ -271,11 +261,7 @@ function resourceCategories(nodeTypeDescription: INodeTypeDescription): ActionTy
 export function useActionsGenerator() {
 	function generateNodeActions(node: INodeTypeDescription | undefined) {
 		if (!node) return [];
-		if (
-			node.codex?.subcategories?.AI?.includes(AI_CATEGORY_TOOLS) &&
-			!node.codex?.subcategories?.AI?.includes(AI_CATEGORY_ROOT_NODES)
-		)
-			return [];
+		if (node.codex?.subcategories?.AI?.includes('Tools')) return [];
 		return [
 			...triggersCategory(node),
 			...operationsCategory(node),
@@ -283,7 +269,6 @@ export function useActionsGenerator() {
 			...modeCategory(node),
 		];
 	}
-
 	function filterActions(actions: ActionTypeDescription[]) {
 		// Do not show single action nodes
 		if (actions.length <= 1) return [];
@@ -332,25 +317,10 @@ export function useActionsGenerator() {
 		nodeTypes: INodeTypeDescription[],
 		httpOnlyCredentials: ICredentialType[],
 	) {
-		const posthogStore = usePostHog();
-
-		const isEvaluationVariantEnabled = posthogStore.isVariantEnabled(
-			EVALUATION_TRIGGER.name,
-			EVALUATION_TRIGGER.variant,
-		);
-
-		const visibleNodeTypes = nodeTypes.filter((node) => {
-			if (isEvaluationVariantEnabled) {
-				return true;
-			}
-			return (
-				node.name !== 'n8n-nodes-base.evaluation' &&
-				node.name !== 'n8n-nodes-base.evaluationTrigger'
-			);
-		});
-
+		const visibleNodeTypes = [...nodeTypes];
 		const actions: ActionsRecord<typeof mergedNodes> = {};
 		const mergedNodes: SimplifiedNodeType[] = [];
+
 		visibleNodeTypes
 			.filter((node) => !node.group.includes('trigger'))
 			.forEach((app) => {

@@ -2,11 +2,10 @@ import { computed, reactive } from 'vue';
 import { defineStore } from 'pinia';
 import { EnterpriseEditionFeature } from '@/constants';
 import { useSettingsStore } from '@/stores/settings.store';
-import { useRootStore } from '@n8n/stores/useRootStore';
+import { useRootStore } from '@/stores/root.store';
 import * as vcApi from '@/api/sourceControl';
 import type { SourceControlPreferences, SshKeyTypes } from '@/types/sourceControl.types';
 import type { TupleToUnion } from '@/utils/typeHelpers';
-import type { SourceControlledFile } from '@n8n/api-types';
 
 export const useSourceControlStore = defineStore('sourceControl', () => {
 	const rootStore = useRootStore();
@@ -40,14 +39,23 @@ export const useSourceControlStore = defineStore('sourceControl', () => {
 
 	const pushWorkfolder = async (data: {
 		commitMessage: string;
-		fileNames: SourceControlledFile[];
+		fileNames?: Array<{
+			conflict: boolean;
+			file: string;
+			id: string;
+			location: string;
+			name: string;
+			status: string;
+			type: string;
+			updatedAt?: string | undefined;
+		}>;
 		force: boolean;
 	}) => {
 		state.commitMessage = data.commitMessage;
 		await vcApi.pushWorkfolder(rootStore.restApiContext, {
 			force: data.force,
-			commitMessage: data.commitMessage,
-			fileNames: data.fileNames,
+			message: data.commitMessage,
+			...(data.fileNames ? { fileNames: data.fileNames } : {}),
 		});
 	};
 

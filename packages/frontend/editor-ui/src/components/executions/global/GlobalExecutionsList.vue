@@ -1,25 +1,22 @@
 <script lang="ts" setup>
-import ConcurrentExecutionsHeader from '@/components/executions/ConcurrentExecutionsHeader.vue';
+import { watch, computed, ref, onMounted } from 'vue';
 import ExecutionsFilter from '@/components/executions/ExecutionsFilter.vue';
 import GlobalExecutionsListItem from '@/components/executions/global/GlobalExecutionsListItem.vue';
-import { useI18n } from '@/composables/useI18n';
-import { useMessage } from '@/composables/useMessage';
-import { usePageRedirectionHelper } from '@/composables/usePageRedirectionHelper';
-import { useTelemetry } from '@/composables/useTelemetry';
-import { useToast } from '@/composables/useToast';
 import { EnterpriseEditionFeature, MODAL_CONFIRM } from '@/constants';
+import { useToast } from '@/composables/useToast';
+import { useMessage } from '@/composables/useMessage';
+import { useI18n } from '@/composables/useI18n';
+import { useTelemetry } from '@/composables/useTelemetry';
 import type { ExecutionFilterType, ExecutionSummaryWithScopes, IWorkflowDb } from '@/Interface';
+import type { ExecutionSummary } from 'n8n-workflow';
+import { useWorkflowsStore } from '@/stores/workflows.store';
+import { useExecutionsStore } from '@/stores/executions.store';
 import type { PermissionsRecord } from '@/permissions';
 import { getResourcePermissions } from '@/permissions';
-import { useExecutionsStore } from '@/stores/executions.store';
 import { useSettingsStore } from '@/stores/settings.store';
-import { useWorkflowsStore } from '@/stores/workflows.store';
-import { executionRetryMessage } from '@/utils/executionUtils';
-import { N8nButton, N8nCheckbox, N8nTableBase } from '@n8n/design-system';
-import { useIntersectionObserver } from '@vueuse/core';
-import { ElSkeletonItem } from 'element-plus';
-import type { ExecutionSummary } from 'n8n-workflow';
-import { computed, ref, useTemplateRef, watch, type ComponentPublicInstance } from 'vue';
+import ProjectHeader from '@/components/Projects/ProjectHeader.vue';
+import ConcurrentExecutionsHeader from '@/components/executions/ConcurrentExecutionsHeader.vue';
+import { usePageRedirectionHelper } from '@/composables/usePageRedirectionHelper';
 
 const props = withDefaults(
 	defineProps<{
@@ -46,6 +43,7 @@ const executionsStore = useExecutionsStore();
 const settingsStore = useSettingsStore();
 const pageRedirectionHelper = usePageRedirectionHelper();
 
+const isMounted = ref(false);
 const allVisibleSelected = ref(false);
 const allExistingSelected = ref(false);
 const selectedItems = ref<Record<string, boolean>>({});
@@ -75,15 +73,8 @@ const isAnnotationEnabled = computed(
 	() => settingsStore.isEnterpriseFeatureEnabled[EnterpriseEditionFeature.AdvancedExecutionFilters],
 );
 
-/**
- * Calculate the number of executions counted towards the production executions concurrency limit.
- * Evaluation executions are not counted towards this limit and the evaluation limit isn't shown in the UI.
- */
 const runningExecutionsCount = computed(() => {
-	return props.executions.filter(
-		(execution) =>
-			execution.status === 'running' && ['webhook', 'trigger'].includes(execution.mode),
-	).length;
+	return props.executions.filter((execution) => execution.status === 'running').length;
 });
 
 watch(
@@ -95,6 +86,10 @@ watch(
 		adjustSelectionAfterMoreItemsLoaded();
 	},
 );
+
+onMounted(() => {
+	isMounted.value = true;
+});
 
 function handleCheckAllExistingChange() {
 	allExistingSelected.value = !allExistingSelected.value;
@@ -201,21 +196,19 @@ function getWorkflowName(workflowId: string): string | undefined {
 	return workflows.value.find((data: IWorkflowDb) => data.id === workflowId)?.name;
 }
 
-const loadMoreRef = useTemplateRef<ComponentPublicInstance>('loadMoreButton');
-useIntersectionObserver(loadMoreRef, ([entry]) => {
-	if (!entry?.isIntersecting) return;
-	void loadMore();
-});
-
 async function loadMore() {
 	if (executionsStore.filters.status === 'running') {
 		return;
 	}
 
-	const lastItem = props.executions.at(-1);
+	let lastId: string | undefined;
+	if (props.executions.length !== 0) {
+		const lastItem = props.executions.slice(-1)[0];
+		lastId = lastItem.id;
+	}
 
 	try {
-		await executionsStore.fetchExecutions(executionsStore.executionsFilters, lastItem?.id);
+		await executionsStore.fetchExecutions(executionsStore.executionsFilters, lastId);
 	} catch (error) {
 		toast.showError(error, i18n.baseText('executionsList.showError.loadMore.title'));
 	}
@@ -244,11 +237,18 @@ async function retryOriginalExecution(execution: ExecutionSummary) {
 
 async function retryExecution(execution: ExecutionSummary, loadWorkflow?: boolean) {
 	try {
-		const retryStatus = await executionsStore.retryExecution(execution.id, loadWorkflow);
-		const retryMessage = executionRetryMessage(retryStatus);
+		const retrySuccessful = await executionsStore.retryExecution(execution.id, loadWorkflow);
 
-		if (retryMessage) {
-			toast.showMessage(retryMessage);
+		if (retrySuccessful) {
+			toast.showMessage({
+				title: i18n.baseText('executionsList.showMessage.retrySuccessfulTrue.title'),
+				type: 'success',
+			});
+		} else {
+			toast.showMessage({
+				title: i18n.baseText('executionsList.showMessage.retrySuccessfulFalse.title'),
+				type: 'error',
+			});
 		}
 	} catch (error) {
 		toast.showError(error, i18n.baseText('executionsList.showError.retryExecution.title'));
@@ -327,132 +327,122 @@ const goToUpgrade = () => {
 
 <template>
 	<div :class="$style.execListWrapper">
-		<slot />
-		<div :class="$style.execListHeaderControls">
-			<ExecutionsFilter
-				:workflows="workflows"
-				class="execFilter"
-				@filter-changed="onFilterChanged"
+		<ProjectHeader />
+		<div :class="$style.execList">
+			<div :class="$style.execListHeader">
+				<div :class="$style.execListHeaderControls">
+					<ConcurrentExecutionsHeader
+						v-if="settingsStore.isConcurrencyEnabled"
+						class="mr-xl"
+						:running-executions-count="runningExecutionsCount"
+						:concurrency-cap="settingsStore.concurrency"
+						:is-cloud-deployment="settingsStore.isCloudDeployment"
+						@go-to-upgrade="goToUpgrade"
+					/>
+					<N8nLoading v-if="!isMounted" :class="$style.filterLoader" variant="custom" />
+					<ElCheckbox
+						v-else
+						v-model="executionsStore.autoRefresh"
+						class="mr-xl"
+						data-test-id="execution-auto-refresh-checkbox"
+						@update:model-value="onAutoRefreshToggle($event)"
+					>
+						{{ i18n.baseText('executionsList.autoRefresh') }}
+					</ElCheckbox>
+					<ExecutionsFilter
+						v-show="isMounted"
+						:workflows="workflows"
+						class="execFilter"
+						@filter-changed="onFilterChanged"
+					/>
+				</div>
+			</div>
+
+			<ElCheckbox
+				v-if="allVisibleSelected && total > 0"
+				:class="$style.selectAll"
+				:label="
+					i18n.baseText('executionsList.selectAll', {
+						adjustToNumber: total,
+						interpolate: { executionNum: `${total}` },
+					})
+				"
+				:model-value="allExistingSelected"
+				data-test-id="select-all-executions-checkbox"
+				@update:model-value="handleCheckAllExistingChange"
 			/>
 
-			<div style="margin-left: auto">
-				<ConcurrentExecutionsHeader
-					v-if="settingsStore.isConcurrencyEnabled"
-					:running-executions-count="runningExecutionsCount"
-					:concurrency-cap="settingsStore.concurrency"
-					:is-cloud-deployment="settingsStore.isCloudDeployment"
-					@go-to-upgrade="goToUpgrade"
-				/>
-				<ElCheckbox
-					v-else
-					v-model="executionsStore.autoRefresh"
-					data-test-id="execution-auto-refresh-checkbox"
-					@update:model-value="onAutoRefreshToggle($event)"
-				>
-					{{ i18n.baseText('executionsList.autoRefresh') }}
-				</ElCheckbox>
+			<div v-if="!isMounted">
+				<N8nLoading :class="$style.tableLoader" variant="custom" />
+				<N8nLoading :class="$style.tableLoader" variant="custom" />
+				<N8nLoading :class="$style.tableLoader" variant="custom" />
 			</div>
-		</div>
-		<div :class="$style.execList">
-			<div :class="$style.execTable">
-				<N8nTableBase>
-					<thead>
-						<tr v-if="allVisibleSelected && total > 0">
-							<th style="width: 50px">
-								<N8nCheckbox
-									:model-value="allExistingSelected"
-									data-test-id="select-all-executions-checkbox"
-									class="mb-0"
-									@update:model-value="handleCheckAllExistingChange"
-								/>
-							</th>
-							<th colspan="8">
-								{{
-									i18n.baseText('executionsList.selectAll', {
-										adjustToNumber: total,
-										interpolate: { count: `${total}` },
-									})
-								}}
-							</th>
-						</tr>
-						<tr>
-							<th style="width: 50px">
-								<N8nCheckbox
-									:model-value="allVisibleSelected"
-									:disabled="total < 1"
-									data-test-id="select-visible-executions-checkbox"
-									class="mb-0"
-									@update:model-value="handleCheckAllVisibleChange"
-								/>
-							</th>
-							<th>
-								{{ i18n.baseText('generic.workflow') }}
-							</th>
-							<th>{{ i18n.baseText('executionsList.status') }}</th>
-							<th>
-								{{ i18n.baseText('executionsList.startedAt') }}
-							</th>
-							<th>
-								{{ i18n.baseText('executionsList.runTime') }}
-							</th>
+			<table v-else :class="$style.execTable">
+				<thead>
+					<tr>
+						<th>
+							<el-checkbox
+								:model-value="allVisibleSelected"
+								:disabled="total < 1"
+								label=""
+								data-test-id="select-visible-executions-checkbox"
+								@update:model-value="handleCheckAllVisibleChange"
+							/>
+						</th>
+						<th>{{ i18n.baseText('executionsList.name') }}</th>
+						<th>{{ i18n.baseText('executionsList.startedAt') }}</th>
+						<th>{{ i18n.baseText('executionsList.status') }}</th>
+						<th>{{ i18n.baseText('executionsList.id') }}</th>
+						<th></th>
+						<th></th>
+						<th></th>
+						<th></th>
+					</tr>
+				</thead>
+				<TransitionGroup tag="tbody" name="executions-list">
+					<GlobalExecutionsListItem
+						v-for="execution in executions"
+						:key="execution.id"
+						:execution="execution"
+						:workflow-name="getExecutionWorkflowName(execution)"
+						:workflow-permissions="getExecutionWorkflowPermissions(execution)"
+						:selected="selectedItems[execution.id] || allExistingSelected"
+						:concurrency-cap="settingsStore.concurrency"
+						:is-cloud-deployment="settingsStore.isCloudDeployment"
+						data-test-id="global-execution-list-item"
+						@stop="stopExecution"
+						@delete="deleteExecution"
+						@select="toggleSelectExecution"
+						@retry-saved="retrySavedExecution"
+						@retry-original="retryOriginalExecution"
+						@go-to-upgrade="goToUpgrade"
+					/>
+				</TransitionGroup>
+			</table>
 
-							<th>{{ i18n.baseText('executionsList.id') }}</th>
-
-							<th></th>
-							<th style="width: 69px"></th>
-							<th style="width: 50px"></th>
-						</tr>
-					</thead>
-					<tbody>
-						<GlobalExecutionsListItem
-							v-for="execution in executions"
-							:key="execution.id"
-							:execution="execution"
-							:workflow-name="getExecutionWorkflowName(execution)"
-							:workflow-permissions="getExecutionWorkflowPermissions(execution)"
-							:selected="selectedItems[execution.id] || allExistingSelected"
-							:concurrency-cap="settingsStore.concurrency"
-							:is-cloud-deployment="settingsStore.isCloudDeployment"
-							data-test-id="global-execution-list-item"
-							@stop="stopExecution"
-							@delete="deleteExecution"
-							@select="toggleSelectExecution"
-							@retry-saved="retrySavedExecution"
-							@retry-original="retryOriginalExecution"
-							@go-to-upgrade="goToUpgrade"
-						/>
-						<template v-if="executionsStore.loading && !executions.length">
-							<tr v-for="item in executionsStore.itemsPerPage" :key="item">
-								<td v-for="col in 9" :key="col">
-									<ElSkeletonItem />
-								</td>
-							</tr>
-						</template>
-						<tr>
-							<td colspan="9" style="text-align: center">
-								<template v-if="!executions.length">
-									<span data-test-id="execution-list-empty">
-										{{ i18n.baseText('executionsList.empty') }}
-									</span>
-								</template>
-								<template v-else-if="total > executions.length || estimated">
-									<N8nButton
-										ref="loadMoreButton"
-										icon="sync"
-										:title="i18n.baseText('executionsList.loadMore')"
-										:label="i18n.baseText('executionsList.loadMore')"
-										:loading="executionsStore.loading"
-										data-test-id="load-more-button"
-										@click="loadMore()"
-									/>
-								</template>
-								<template v-else>
-									{{ i18n.baseText('executionsList.loadedAll') }}
-								</template>
-							</td>
-						</tr>
-					</tbody>
-				</N8nTableBase>
+			<div
+				v-if="!executions.length && isMounted && !executionsStore.loading"
+				:class="$style.loadedAll"
+				data-test-id="execution-list-empty"
+			>
+				{{ i18n.baseText('executionsList.empty') }}
+			</div>
+			<div v-else-if="total > executions.length || estimated" :class="$style.loadMore">
+				<N8nButton
+					icon="sync"
+					:title="i18n.baseText('executionsList.loadMore')"
+					:label="i18n.baseText('executionsList.loadMore')"
+					:loading="executionsStore.loading"
+					data-test-id="load-more-button"
+					@click="loadMore()"
+				/>
+			</div>
+			<div
+				v-else-if="isMounted && !executionsStore.loading"
+				:class="$style.loadedAll"
+				data-test-id="execution-all-loaded"
+			>
+				{{ i18n.baseText('executionsList.loadedAll') }}
 			</div>
 		</div>
 		<div
@@ -486,25 +476,32 @@ const goToUpgrade = () => {
 
 <style module lang="scss">
 .execListWrapper {
-	padding: var(--spacing-l) var(--spacing-2xl);
-	display: flex;
-	flex-direction: column;
-	overflow: hidden;
+	display: grid;
+	grid-template-rows: auto auto 1fr 0;
+	position: relative;
+	height: 100%;
 	width: 100%;
+	padding: var(--spacing-l) var(--spacing-2xl) 0;
 	max-width: var(--content-container-width);
 }
 
 .execList {
-	flex-shrink: 1; /* Allows shrinking when needed */
-	max-height: 100%; /* Prevents overflowing the parent */
-	overflow: auto; /* Scroll only when needed */
+	position: relative;
+	height: 100%;
+	overflow: auto;
+}
+
+.execListHeader {
+	display: flex;
+	align-items: center;
+	justify-content: flex-start;
+	margin-bottom: var(--spacing-s);
 }
 
 .execListHeaderControls {
 	display: flex;
 	align-items: center;
-	justify-content: flex-start;
-	margin-bottom: var(--spacing-s);
+	justify-content: flex-end;
 }
 
 .selectionOptions {
@@ -527,12 +524,95 @@ const goToUpgrade = () => {
 }
 
 .execTable {
-	height: 100%;
-	flex: 0 1 auto;
+	/*
+	  Table height needs to be set to 0 in order to use height 100% for elements in table cells
+	*/
+	height: 0;
+	width: 100%;
+	text-align: left;
+	font-size: var(--font-size-s);
+
+	thead th {
+		position: sticky;
+		top: calc(var(--spacing-3xl) * -1);
+		z-index: 2;
+		padding: var(--spacing-s) var(--spacing-s) var(--spacing-s) 0;
+		background: var(--color-table-header-background);
+
+		&:first-child {
+			padding-left: var(--spacing-s);
+		}
+	}
+
+	th,
+	td {
+		height: 100%;
+		padding: var(--spacing-s) var(--spacing-s) var(--spacing-s) 0;
+
+		&:not(:first-child, :nth-last-child(-n + 3)) {
+			width: 100%;
+		}
+
+		&:nth-last-child(-n + 2) {
+			padding-left: 0;
+		}
+
+		@media (min-width: $breakpoint-sm) {
+			&:not(:nth-child(2)) {
+				&,
+				div,
+				span {
+					white-space: nowrap;
+				}
+			}
+		}
+	}
+}
+
+.loadMore {
+	margin: var(--spacing-m) 0;
+	width: 100%;
+	text-align: center;
+}
+
+.loadedAll {
+	text-align: center;
+	font-size: var(--font-size-s);
+	color: var(--color-text-light);
+	margin: var(--spacing-l) 0;
+}
+
+.actions.deleteOnly {
+	padding: 0;
+}
+
+.retryAction + .deleteAction {
+	border-top: 1px solid var(--color-foreground-light);
+}
+
+.selectAll {
+	display: inline-block;
+	margin: 0 0 var(--spacing-s) var(--spacing-s);
+	color: var(--execution-select-all-text);
+}
+
+.filterLoader {
+	width: 220px;
+	height: 32px;
+}
+
+.tableLoader {
+	width: 100%;
+	height: 48px;
+	margin-bottom: var(--spacing-2xs);
 }
 </style>
 
 <style lang="scss" scoped>
+.execFilter:deep(button) {
+	height: 40px;
+}
+
 :deep(.el-checkbox) {
 	display: inline-flex;
 	align-items: center;

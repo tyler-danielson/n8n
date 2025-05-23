@@ -1,180 +1,147 @@
 <script setup lang="ts">
-import type { TestRunRecord } from '@/api/testDefinition.ee';
-import TimeAgo from '@/components/TimeAgo.vue';
+import type { TestListItem } from '@/components/TestDefinition/types';
 import { useI18n } from '@/composables/useI18n';
-import { N8nIcon, N8nText } from '@n8n/design-system';
-import type { IconColor } from '@n8n/design-system/types/icon';
-import { computed } from 'vue';
+import n8nIconButton from 'n8n-design-system/components/N8nIconButton';
 
-const props = defineProps<{
-	name: string;
-	testCases: number;
-	execution?: TestRunRecord;
-	errors?: Array<{ field: string; message: string }>;
-}>();
+export interface TestItemProps {
+	test: TestListItem;
+}
 
+const props = defineProps<TestItemProps>();
 const locale = useI18n();
 
-type IconDefinition = { icon: string; color: IconColor; spin?: boolean };
+const emit = defineEmits<{
+	'run-test': [testId: string];
+	'view-details': [testId: string];
+	'edit-test': [testId: string];
+	'delete-test': [testId: string];
+}>();
 
-const statusesColorDictionary: Record<TestRunRecord['status'], IconDefinition> = {
-	new: {
-		icon: 'circle',
-		color: 'foreground-dark',
+const actions = [
+	{
+		icon: 'play',
+		event: () => emit('run-test', props.test.id),
+		tooltip: locale.baseText('testDefinition.runTest'),
 	},
-	running: {
-		icon: 'spinner',
-		color: 'secondary',
-		spin: true,
+	{
+		icon: 'list',
+		event: () => emit('view-details', props.test.id),
+		tooltip: locale.baseText('testDefinition.viewDetails'),
 	},
-	completed: {
-		icon: 'exclamation-circle',
-		color: 'success',
+	{
+		icon: 'pen',
+		event: () => emit('edit-test', props.test.id),
+		tooltip: locale.baseText('testDefinition.editTest'),
 	},
-	error: {
-		icon: 'exclamation-triangle',
-		color: 'danger',
+	{
+		icon: 'trash',
+		event: () => emit('delete-test', props.test.id),
+		tooltip: locale.baseText('testDefinition.deleteTest'),
 	},
-	cancelled: {
-		icon: 'minus-circle',
-		color: 'foreground-xdark',
-	},
-	warning: {
-		icon: 'exclamation-circle',
-		color: 'warning',
-	},
-	success: {
-		icon: 'circle-check',
-		color: 'success',
-	},
-} as const;
-
-const statusRender = computed<IconDefinition & { label: string }>(() => {
-	if (props.errors?.length) {
-		return {
-			icon: 'adjust',
-			color: 'foreground-dark',
-			label: 'Incomplete',
-		};
-	}
-
-	if (!props.execution) {
-		return {
-			icon: 'circle',
-			color: 'foreground-dark',
-			label: 'Never ran',
-		};
-	}
-
-	return {
-		...statusesColorDictionary[props.execution.status],
-		label: props.execution.status,
-	};
-});
+];
 </script>
 
 <template>
-	<div :class="$style.testCard">
-		<div :class="$style.testCardContent">
-			<div>
-				<N8nText bold tag="div" :class="$style.name">{{ name }}</N8nText>
-				<N8nText tag="div" color="text-base" size="small">
-					{{
-						locale.baseText('testDefinition.list.item.tests', {
-							adjustToNumber: testCases,
-						})
-					}}
-				</N8nText>
+	<div :class="$style.testItem" @click="$emit('view-details', test.id)">
+		<div :class="$style.testInfo">
+			<div :class="$style.testName">
+				{{ test.name }}
+				<n8n-tag v-if="test.tagName" :text="test.tagName" />
 			</div>
-			<div>
-				<div :class="$style.status">
-					<N8nIcon v-bind="statusRender" size="small" />
-					<N8nText size="small" color="text-base">
-						{{ statusRender.label }}
-					</N8nText>
-				</div>
-
-				<N8nText v-if="errors?.length" tag="div" color="text-base" size="small" class="ml-m">
-					{{
-						locale.baseText('testDefinition.list.item.missingFields', {
-							adjustToNumber: errors.length,
-						})
-					}}
-				</N8nText>
-				<N8nText v-else-if="execution" tag="div" color="text-base" size="small" class="ml-m">
-					<TimeAgo :date="execution.updatedAt" />
-				</N8nText>
-			</div>
-
-			<div :class="$style.metrics">
-				<template v-if="execution?.metrics">
-					<template v-for="[key, value] in Object.entries(execution.metrics)" :key>
-						<N8nText
-							color="text-base"
-							size="small"
-							style="overflow: hidden; text-overflow: ellipsis"
-						>
-							{{ key }}
-						</N8nText>
-						<N8nText color="text-base" size="small" bold>
-							{{ Math.round((value + Number.EPSILON) * 100) / 100 }}
-						</N8nText>
-					</template>
-				</template>
+			<div :class="$style.testCases">
+				{{ locale.baseText('testDefinition.list.testCases', { adjustToNumber: test.testCases }) }}
+				<n8n-loading v-if="!test.execution.lastRun" :loading="true" :rows="1" />
+				<span v-else>{{
+					locale.baseText('testDefinition.list.lastRun', {
+						interpolate: { lastRun: test.execution.lastRun },
+					})
+				}}</span>
 			</div>
 		</div>
 
-		<slot name="prepend"></slot>
-		<slot name="append"></slot>
+		<div :class="$style.metrics">
+			<div :class="$style.metric">
+				{{
+					locale.baseText('testDefinition.list.errorRate', {
+						interpolate: { errorRate: test.execution.errorRate ?? '-' },
+					})
+				}}
+			</div>
+			<div v-for="(value, key) in test.execution.metrics" :key="key" :class="$style.metric">
+				{{ key }}: {{ value ?? '-' }}
+			</div>
+		</div>
+
+		<div :class="$style.actions">
+			<n8n-tooltip v-for="action in actions" :key="action.icon" placement="top" :show-after="1000">
+				<template #content>
+					{{ action.tooltip }}
+				</template>
+				<component
+					:is="n8nIconButton"
+					:icon="action.icon"
+					type="tertiary"
+					size="mini"
+					@click.stop="action.event"
+				/>
+			</n8n-tooltip>
+		</div>
 	</div>
 </template>
 
 <style module lang="scss">
-.testCard {
+.testItem {
 	display: flex;
 	align-items: center;
-	background-color: var(--color-background-xlight);
-	padding: var(--spacing-xs) 20px var(--spacing-xs) var(--spacing-m);
-	gap: var(--spacing-s);
-	border-bottom: 1px solid var(--color-foreground-base);
+	padding: var(--spacing-s) var(--spacing-s) var(--spacing-s) var(--spacing-xl);
+	border: 1px solid var(--color-foreground-base);
+	border-radius: var(--border-radius-base);
+	background-color: var(--color-background-light);
 	cursor: pointer;
 
-	&:first-child {
-		border-top-left-radius: inherit;
-		border-top-right-radius: inherit;
-	}
-	&:last-child {
-		border-bottom-color: transparent;
-		border-bottom-left-radius: inherit;
-		border-bottom-right-radius: inherit;
-	}
-
 	&:hover {
-		background-color: var(--color-background-light);
-		.name {
-			color: var(--color-primary);
-		}
+		background-color: var(--color-background-base);
 	}
 }
 
-.status {
-	display: inline-flex;
-	gap: 8px;
-	text-transform: capitalize;
-	align-items: center;
+.testInfo {
+	display: flex;
+	flex: 1;
+	gap: var(--spacing-2xs);
 }
 
-.testCardContent {
-	display: grid;
-	grid-template-columns: 2fr 1fr 1fr;
+.testName {
+	display: flex;
 	align-items: center;
-	flex: 1;
-	gap: var(--spacing-xs);
+	gap: var(--spacing-2xs);
+	font-weight: var(--font-weight-bold);
+	margin-bottom: var(--spacing-4xs);
+	font-size: var(--font-size-s);
+}
+
+.testCases {
+	color: var(--color-text-base);
+	font-size: var(--font-size-2xs);
+	display: flex;
+	align-items: center;
+	gap: var(--spacing-2xs);
 }
 
 .metrics {
-	display: grid;
-	grid-template-columns: 120px 1fr;
-	column-gap: 18px;
+	display: flex;
+	gap: var(--spacing-l);
+	margin: 0 var(--spacing-l);
+}
+
+.metric {
+	font-size: var(--font-size-2xs);
+	color: var(--color-text-dark);
+	white-space: nowrap;
+}
+
+.actions {
+	display: flex;
+	gap: var(--spacing-xs);
+	--color-button-secondary-font: var(--color-callout-info-icon);
 }
 </style>

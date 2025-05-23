@@ -1,10 +1,10 @@
 import * as communityNodesApi from '@/api/communityNodes';
 import { getAvailableCommunityPackageCount } from '@/api/settings';
 import { defineStore } from 'pinia';
-import { useRootStore } from '@n8n/stores/useRootStore';
+import { useRootStore } from './root.store';
 import type { PublicInstalledPackage } from 'n8n-workflow';
 import type { CommunityPackageMap } from '@/Interface';
-import { STORES } from '@n8n/stores';
+import { STORES } from '@/constants';
 import { computed, ref } from 'vue';
 
 const LOADER_DELAY = 300;
@@ -54,23 +54,22 @@ export const useCommunityNodesStore = defineStore(STORES.COMMUNITY_NODES, () => 
 		}, timeout);
 	};
 
-	const installPackage = async (
-		packageName: string,
-		verify?: boolean,
-		version?: string,
-	): Promise<void> => {
-		await communityNodesApi.installNewPackage(
-			rootStore.restApiContext,
-			packageName,
-			verify,
-			version,
-		);
-		await fetchInstalledPackages();
+	const installPackage = async (packageName: string): Promise<void> => {
+		try {
+			await communityNodesApi.installNewPackage(rootStore.restApiContext, packageName);
+			await fetchInstalledPackages();
+		} catch (error) {
+			throw error;
+		}
 	};
 
 	const uninstallPackage = async (packageName: string): Promise<void> => {
-		await communityNodesApi.uninstallPackage(rootStore.restApiContext, packageName);
-		removePackageByName(packageName);
+		try {
+			await communityNodesApi.uninstallPackage(rootStore.restApiContext, packageName);
+			removePackageByName(packageName);
+		} catch (error) {
+			throw error;
+		}
 	};
 
 	const removePackageByName = (name: string): void => {
@@ -83,12 +82,16 @@ export const useCommunityNodesStore = defineStore(STORES.COMMUNITY_NODES, () => 
 	};
 
 	const updatePackage = async (packageName: string): Promise<void> => {
-		const packageToUpdate = installedPackages.value[packageName];
-		const updatedPackage = await communityNodesApi.updatePackage(
-			rootStore.restApiContext,
-			packageToUpdate.packageName,
-		);
-		updatePackageObject(updatedPackage);
+		try {
+			const packageToUpdate = installedPackages.value[packageName];
+			const updatedPackage = await communityNodesApi.updatePackage(
+				rootStore.restApiContext,
+				packageToUpdate.packageName,
+			);
+			updatePackageObject(updatedPackage);
+		} catch (error) {
+			throw error;
+		}
 	};
 
 	return {

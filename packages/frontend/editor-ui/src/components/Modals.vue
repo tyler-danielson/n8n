@@ -7,7 +7,6 @@ import {
 	COMMUNITY_PACKAGE_INSTALL_MODAL_KEY,
 	CONTACT_PROMPT_MODAL_KEY,
 	CREDENTIAL_EDIT_MODAL_KEY,
-	API_KEY_CREATE_OR_EDIT_MODAL_KEY,
 	CREDENTIAL_SELECT_MODAL_KEY,
 	DELETE_USER_MODAL_KEY,
 	DUPLICATE_MODAL_KEY,
@@ -33,11 +32,6 @@ import {
 	PROJECT_MOVE_RESOURCE_MODAL,
 	PROMPT_MFA_CODE_MODAL_KEY,
 	COMMUNITY_PLUS_ENROLLMENT_MODAL,
-	DELETE_FOLDER_MODAL_KEY,
-	MOVE_FOLDER_MODAL_KEY,
-	WORKFLOW_ACTIVATION_CONFLICTING_WEBHOOK_MODAL_KEY,
-	FROM_AI_PARAMETERS_MODAL_KEY,
-	IMPORT_WORKFLOW_URL_MODAL_KEY,
 } from '@/constants';
 
 import AboutModal from '@/components/AboutModal.vue';
@@ -60,7 +54,6 @@ import WorkflowSettings from '@/components/WorkflowSettings.vue';
 import DeleteUserModal from '@/components/DeleteUserModal.vue';
 import ActivationModal from '@/components/ActivationModal.vue';
 import ImportCurlModal from '@/components/ImportCurlModal.vue';
-import ApiKeyCreateOrEditModal from '@/components/ApiKeyCreateOrEditModal.vue';
 import MfaSetupModal from '@/components/MfaSetupModal.vue';
 import WorkflowShareModal from '@/components/WorkflowShareModal.ee.vue';
 import EventDestinationSettingsModal from '@/components/SettingsLogStreaming/EventDestinationSettingsModal.ee.vue';
@@ -71,13 +64,10 @@ import DebugPaywallModal from '@/components/DebugPaywallModal.vue';
 import WorkflowHistoryVersionRestoreModal from '@/components/WorkflowHistory/WorkflowHistoryVersionRestoreModal.vue';
 import SetupWorkflowCredentialsModal from '@/components/SetupWorkflowCredentialsModal/SetupWorkflowCredentialsModal.vue';
 import ProjectMoveResourceModal from '@/components/Projects/ProjectMoveResourceModal.vue';
-import NewAssistantSessionModal from '@/components/AskAssistant/Chat/NewAssistantSessionModal.vue';
+import NewAssistantSessionModal from '@/components/AskAssistant/NewAssistantSessionModal.vue';
 import PromptMfaCodeModal from './PromptMfaCodeModal/PromptMfaCodeModal.vue';
 import CommunityPlusEnrollmentModal from '@/components/CommunityPlusEnrollmentModal.vue';
-import WorkflowActivationConflictingWebhookModal from '@/components/WorkflowActivationConflictingWebhookModal.vue';
-import FromAiParametersModal from '@/components/FromAiParametersModal.vue';
-import ImportWorkflowUrlModal from '@/components/ImportWorkflowUrlModal.vue';
-import type { EventBus } from '@n8n/utils/event-bus';
+import type { EventBus } from 'n8n-design-system';
 </script>
 
 <template>
@@ -93,21 +83,6 @@ import type { EventBus } from '@n8n/utils/event-bus';
 				<CredentialEdit :modal-name="modalName" :mode="mode" :active-id="activeId" />
 			</template>
 		</ModalRoot>
-
-		<ModalRoot :name="API_KEY_CREATE_OR_EDIT_MODAL_KEY">
-			<template
-				#default="{
-					modalName,
-					data: { mode, activeId },
-				}: {
-					modalName: string;
-					data: { mode: 'new' | 'edit'; activeId: string };
-				}"
-			>
-				<ApiKeyCreateOrEditModal :modal-name="modalName" :mode="mode" :active-id="activeId" />
-			</template>
-		</ModalRoot>
-
 		<ModalRoot :name="ABOUT_MODAL_KEY">
 			<AboutModal />
 		</ModalRoot>
@@ -124,10 +99,6 @@ import type { EventBus } from '@n8n/utils/event-bus';
 			<template #default="{ modalName, active, data }">
 				<DuplicateWorkflowDialog :data="data" :is-active="active" :modal-name="modalName" />
 			</template>
-		</ModalRoot>
-
-		<ModalRoot :name="IMPORT_WORKFLOW_URL_MODAL_KEY">
-			<ImportWorkflowUrlModal />
 		</ModalRoot>
 
 		<ModalRoot :name="PERSONALIZATION_MODAL_KEY">
@@ -290,30 +261,6 @@ import type { EventBus } from '@n8n/utils/event-bus';
 		<ModalRoot :name="COMMUNITY_PLUS_ENROLLMENT_MODAL">
 			<template #default="{ modalName, data }">
 				<CommunityPlusEnrollmentModal :modal-name="modalName" :data="data" />
-			</template>
-		</ModalRoot>
-
-		<ModalRoot :name="DELETE_FOLDER_MODAL_KEY">
-			<template #default="{ modalName, activeId, data }">
-				<DeleteFolderModal :modal-name="modalName" :active-id="activeId" :data="data" />
-			</template>
-		</ModalRoot>
-
-		<ModalRoot :name="MOVE_FOLDER_MODAL_KEY">
-			<template #default="{ modalName, activeId, data }">
-				<MoveToFolderModal :modal-name="modalName" :active-id="activeId" :data="data" />
-			</template>
-		</ModalRoot>
-
-		<ModalRoot :name="WORKFLOW_ACTIVATION_CONFLICTING_WEBHOOK_MODAL_KEY">
-			<template #default="{ modalName, data }">
-				<WorkflowActivationConflictingWebhookModal :data="data" :modal-name="modalName" />
-			</template>
-		</ModalRoot>
-
-		<ModalRoot :name="FROM_AI_PARAMETERS_MODAL_KEY">
-			<template #default="{ modalName, data }">
-				<FromAiParametersModal :modal-name="modalName" :data="data" />
 			</template>
 		</ModalRoot>
 	</div>

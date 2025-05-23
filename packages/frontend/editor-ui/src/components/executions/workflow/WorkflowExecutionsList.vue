@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import WorkflowExecutionsSidebar from '@/components/executions/workflow/WorkflowExecutionsSidebar.vue';
-import { useWorkflowSaving } from '@/composables/useWorkflowSaving';
-import { MAIN_HEADER_TABS } from '@/constants';
-import type { ExecutionFilterType, IWorkflowDb } from '@/Interface';
-import { getNodeViewTab } from '@/utils/nodeViewUtils';
-import type { ExecutionSummary } from 'n8n-workflow';
-import { computed } from 'vue';
+import { computed, watch } from 'vue';
 import { onBeforeRouteLeave, useRouter } from 'vue-router';
+import WorkflowExecutionsSidebar from '@/components/executions/workflow/WorkflowExecutionsSidebar.vue';
+import { MAIN_HEADER_TABS, VIEWS } from '@/constants';
+import type { ExecutionFilterType, IWorkflowDb } from '@/Interface';
+import type { ExecutionSummary } from 'n8n-workflow';
+import { getNodeViewTab } from '@/utils/canvasUtils';
+import { useWorkflowHelpers } from '@/composables/useWorkflowHelpers';
 
 const props = withDefaults(
 	defineProps<{
@@ -33,8 +33,8 @@ const emit = defineEmits<{
 	reload: [];
 }>();
 
+const workflowHelpers = useWorkflowHelpers({ router: useRouter() });
 const router = useRouter();
-const { promptSaveUnsavedWorkflowChanges } = useWorkflowSaving({ router });
 
 const temporaryExecution = computed<ExecutionSummary | undefined>(() =>
 	props.executions.find((execution) => execution.id === props.execution?.id)
@@ -67,13 +67,29 @@ const onRetryExecution = (payload: { execution: ExecutionSummary; command: strin
 	});
 };
 
+watch(
+	() => props.execution,
+	(value: ExecutionSummary | undefined) => {
+		if (!value) {
+			return;
+		}
+
+		router
+			.push({
+				name: VIEWS.EXECUTION_PREVIEW,
+				params: { name: props.workflow.id, executionId: value.id },
+			})
+			.catch(() => {});
+	},
+);
+
 onBeforeRouteLeave(async (to, _, next) => {
 	if (getNodeViewTab(to) === MAIN_HEADER_TABS.WORKFLOW) {
 		next();
 		return;
 	}
 
-	await promptSaveUnsavedWorkflowChanges(next);
+	await workflowHelpers.promptSaveUnsavedWorkflowChanges(next);
 });
 </script>
 
@@ -112,15 +128,5 @@ onBeforeRouteLeave(async (to, _, next) => {
 
 .content {
 	flex: 1;
-}
-
-@include mixins.breakpoint('sm-and-down') {
-	.container {
-		flex-direction: column;
-	}
-
-	.content {
-		flex: 1 1 50%;
-	}
 }
 </style>

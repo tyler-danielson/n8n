@@ -1,6 +1,6 @@
-import { STORES } from '@n8n/stores';
+import { STORES } from '@/constants';
 import { defineStore } from 'pinia';
-import { useRootStore } from '@n8n/stores/useRootStore';
+import { useRootStore } from './root.store';
 import { useNDVStore } from './ndv.store';
 import { useUIStore } from './ui.store';
 import { useUsersStore } from './users.store';

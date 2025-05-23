@@ -1,23 +1,17 @@
 <script lang="ts" setup>
 import { computed } from 'vue';
 import { useI18n } from '@/composables/useI18n';
-import { ResourceType } from '@/utils/projects.utils';
+import type { ResourceType } from '@/utils/projects.utils';
 import { splitName } from '@/utils/projects.utils';
-import type { Project, ProjectIcon as BadgeIcon } from '@/types/projects.types';
+import type { ICredentialsResponse, IWorkflowDb } from '@/Interface';
+import type { Project } from '@/types/projects.types';
 import { ProjectTypes } from '@/types/projects.types';
-import type {
-	CredentialsResource,
-	FolderResource,
-	WorkflowResource,
-} from '../layouts/ResourcesListLayout.vue';
-import { VIEWS } from '@/constants';
 
 type Props = {
-	resource: WorkflowResource | CredentialsResource | FolderResource;
+	resource: IWorkflowDb | ICredentialsResponse;
 	resourceType: ResourceType;
 	resourceTypeLabel: string;
 	personalProject: Project | null;
-	showBadgeBorder?: boolean;
 };
 
 const enum ProjectState {
@@ -30,9 +24,7 @@ const enum ProjectState {
 	Unknown = 'unknown',
 }
 
-const props = withDefaults(defineProps<Props>(), {
-	showBadgeBorder: true,
-});
+const props = defineProps<Props>();
 
 const i18n = useI18n();
 
@@ -76,19 +68,16 @@ const badgeText = computed(() => {
 		return name ?? email ?? '';
 	}
 });
-
-const badgeIcon = computed<BadgeIcon>(() => {
+const badgeIcon = computed(() => {
 	switch (projectState.value) {
 		case ProjectState.Owned:
 		case ProjectState.SharedOwned:
-		case ProjectState.Personal:
-		case ProjectState.SharedPersonal:
-			return { type: 'icon', value: 'user' };
+			return 'user';
 		case ProjectState.Team:
 		case ProjectState.SharedTeam:
-			return props.resource.homeProject?.icon ?? { type: 'icon', value: 'layer-group' };
+			return 'layer-group';
 		default:
-			return { type: 'icon', value: 'layer-group' };
+			return '';
 	}
 });
 const badgeTooltip = computed(() => {
@@ -134,70 +123,36 @@ const badgeTooltip = computed(() => {
 			return '';
 	}
 });
-const projectLocation = computed(() => {
-	if (
-		projectState.value !== ProjectState.Personal &&
-		projectState.value !== ProjectState.SharedPersonal &&
-		props.resource.homeProject?.id &&
-		props.resourceType === ResourceType.Workflow
-	) {
-		return {
-			name: VIEWS.PROJECTS_WORKFLOWS,
-			params: { projectId: props.resource.homeProject.id },
-		};
-	}
-	return null;
-});
 </script>
 <template>
-	<div :class="{ [$style.wrapper]: true, [$style['no-border']]: showBadgeBorder }" v-bind="$attrs">
-		<N8nTooltip :disabled="!badgeTooltip || numberOfMembersInHomeTeamProject !== 0" placement="top">
+	<N8nTooltip :disabled="!badgeTooltip" placement="top">
+		<div class="mr-xs">
 			<N8nBadge
 				v-if="badgeText"
-				:class="[$style.badge, $style.projectBadge]"
+				:class="$style.badge"
 				theme="tertiary"
+				bold
 				data-test-id="card-badge"
-				:show-border="showBadgeBorder"
 			>
-				<ProjectIcon :icon="badgeIcon" :border-less="true" size="mini" />
-				<router-link v-if="projectLocation" :to="projectLocation">
-					<span v-n8n-truncate:20="badgeText" />
-				</router-link>
-				<span v-else v-n8n-truncate:20="badgeText" />
+				<N8nIcon v-if="badgeIcon" :icon="badgeIcon" size="small" class="mr-3xs" />
+				<span v-n8n-truncate:20>{{ badgeText }}</span>
 			</N8nBadge>
-			<template #content>
-				{{ badgeTooltip }}
-			</template>
-		</N8nTooltip>
-		<slot />
-		<N8nTooltip :disabled="!badgeTooltip || numberOfMembersInHomeTeamProject === 0" placement="top">
-			<div
+			<N8nBadge
 				v-if="numberOfMembersInHomeTeamProject"
-				:class="$style['count-badge']"
+				:class="[$style.badge, $style.countBadge]"
 				theme="tertiary"
 				bold
 			>
-				+{{ numberOfMembersInHomeTeamProject }}
-			</div>
-			<template #content>
-				{{ badgeTooltip }}
-			</template>
-		</N8nTooltip>
-	</div>
+				+ {{ numberOfMembersInHomeTeamProject }}
+			</N8nBadge>
+		</div>
+		<template #content>
+			{{ badgeTooltip }}
+		</template>
+	</N8nTooltip>
 </template>
 
 <style lang="scss" module>
-.wrapper {
-	display: flex;
-	align-items: center;
-	border: var(--border-base);
-	border-radius: var(--border-radius-base);
-
-	&.no-border {
-		border: none;
-	}
-}
-
 .badge {
 	padding: var(--spacing-4xs) var(--spacing-2xs);
 	background-color: var(--color-background-xlight);
@@ -206,24 +161,18 @@ const projectLocation = computed(() => {
 	z-index: 1;
 	position: relative;
 	height: 23px;
-	:global(.n8n-text),
-	a {
+	:global(.n8n-text) {
 		color: var(--color-text-base);
 	}
 }
 
-.projectBadge {
-	& > span {
-		display: flex;
-		gap: var(--spacing-3xs);
+.countBadge {
+	margin-left: -5px;
+	z-index: 0;
+	position: relative;
+	height: 23px;
+	:global(.n8n-text) {
+		color: var(--color-text-light);
 	}
-}
-
-.count-badge {
-	font-size: var(--font-size-2xs);
-	padding: var(--spacing-4xs) var(--spacing-3xs);
-	color: var(--color-text-base);
-	border-left: var(--border-base);
-	line-height: var(--font-line-height-regular);
 }
 </style>

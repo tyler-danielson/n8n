@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
-import type { IDataObject, ExecutionSummary, AnnotationVote, ExecutionStatus } from 'n8n-workflow';
+import type { IDataObject, ExecutionSummary, AnnotationVote } from 'n8n-workflow';
 import type {
 	ExecutionFilterType,
 	ExecutionsQueryFilter,
@@ -11,7 +11,7 @@ import type {
 	IExecutionsListResponse,
 	IExecutionsStopData,
 } from '@/Interface';
-import { useRootStore } from '@n8n/stores/useRootStore';
+import { useRootStore } from '@/stores/root.store';
 import { makeRestApiRequest, unflattenExecutionData } from '@/utils/apiUtils';
 import { executionFilterToQueryFilter, getDefaultExecutionFilters } from '@/utils/executionUtils';
 import { useProjectsStore } from '@/stores/projects.store';
@@ -70,7 +70,7 @@ export const useExecutionsStore = defineStore('executions', () => {
 
 	const currentExecutionsById = ref<Record<string, ExecutionSummaryWithScopes>>({});
 	const startedAtSortFn = (a: ExecutionSummary, b: ExecutionSummary) =>
-		new Date(b.startedAt ?? b.createdAt).getTime() - new Date(a.startedAt ?? a.createdAt).getTime();
+		new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime();
 
 	/**
 	 * Prioritize `running` over `new` executions, then sort by start timestamp.
@@ -172,7 +172,8 @@ export const useExecutionsStore = defineStore('executions', () => {
 
 			executionsCount.value = data.count;
 			executionsCountEstimated.value = data.estimated;
-			return data;
+		} catch (e) {
+			throw e;
 		} finally {
 			loading.value = false;
 		}
@@ -240,7 +241,7 @@ export const useExecutionsStore = defineStore('executions', () => {
 		);
 	}
 
-	async function retryExecution(id: string, loadWorkflow?: boolean): Promise<ExecutionStatus> {
+	async function retryExecution(id: string, loadWorkflow?: boolean): Promise<boolean> {
 		return await makeRestApiRequest(
 			rootStore.restApiContext,
 			'POST',
@@ -268,7 +269,7 @@ export const useExecutionsStore = defineStore('executions', () => {
 		if (sendData.deleteBefore) {
 			const deleteBefore = new Date(sendData.deleteBefore);
 			allExecutions.value.forEach((execution) => {
-				if (new Date(execution.startedAt ?? execution.createdAt) < deleteBefore) {
+				if (new Date(execution.startedAt) < deleteBefore) {
 					removeExecution(execution.id);
 				}
 			});
@@ -319,6 +320,5 @@ export const useExecutionsStore = defineStore('executions', () => {
 		addExecution,
 		resetData,
 		reset,
-		itemsPerPage,
 	};
 });

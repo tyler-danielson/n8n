@@ -1,10 +1,7 @@
-import type {
-	PullWorkFolderRequestDto,
-	PushWorkFolderRequestDto,
-	SourceControlledFile,
-} from '@n8n/api-types';
+import type { IDataObject } from 'n8n-workflow';
 import type { IRestApiContext } from '@/Interface';
 import type {
+	SourceControlAggregatedFile,
 	SourceControlPreferences,
 	SourceControlStatus,
 	SshKeyTypes,
@@ -25,15 +22,15 @@ const createPreferencesRequestFn =
 
 export const pushWorkfolder = async (
 	context: IRestApiContext,
-	data: PushWorkFolderRequestDto,
+	data: IDataObject,
 ): Promise<void> => {
 	return await makeRestApiRequest(context, 'POST', `${sourceControlApiRoot}/push-workfolder`, data);
 };
 
 export const pullWorkfolder = async (
 	context: IRestApiContext,
-	data: PullWorkFolderRequestDto,
-): Promise<SourceControlledFile[]> => {
+	data: IDataObject,
+): Promise<void> => {
 	return await makeRestApiRequest(context, 'POST', `${sourceControlApiRoot}/pull-workfolder`, data);
 };
 
@@ -63,7 +60,7 @@ export const getAggregatedStatus = async (
 		preferLocalVersion: boolean;
 		verbose: boolean;
 	} = { direction: 'push', preferLocalVersion: true, verbose: false },
-): Promise<SourceControlledFile[]> => {
+): Promise<SourceControlAggregatedFile[]> => {
 	return await makeRestApiRequest(context, 'GET', `${sourceControlApiRoot}/get-status`, options);
 };
 

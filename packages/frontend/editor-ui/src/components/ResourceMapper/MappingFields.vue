@@ -28,7 +28,7 @@ import {
 	N8nOption,
 	N8nSelect,
 	N8nTooltip,
-} from '@n8n/design-system';
+} from 'n8n-design-system';
 import { useI18n } from '@/composables/useI18n';
 
 interface Props {
@@ -310,6 +310,15 @@ defineExpose({
 			color="text-dark"
 		>
 			<template #options>
+				<ParameterOptions
+					:parameter="parameter"
+					:custom-actions="parameterActions"
+					:loading="props.refreshInProgress"
+					:loading-message="fetchingFieldsLabel"
+					:is-read-only="isReadOnly"
+					:value="props.paramValue"
+					@update:model-value="onParameterActionSelected"
+				/>
 				<div v-if="props.isDataStale && !props.refreshInProgress" :class="$style.staleDataWarning">
 					<N8nTooltip>
 						<template #content>
@@ -331,15 +340,6 @@ defineExpose({
 						@click="onParameterActionSelected('refreshFieldList')"
 					/>
 				</div>
-				<ParameterOptions
-					:parameter="parameter"
-					:custom-actions="parameterActions"
-					:loading="props.refreshInProgress"
-					:loading-message="fetchingFieldsLabel"
-					:is-read-only="isReadOnly"
-					:value="props.paramValue"
-					@update:model-value="onParameterActionSelected"
-				/>
 			</template>
 		</N8nInputLabel>
 		<div v-if="orderedFields.length === 0" class="mt-3xs mb-xs">
@@ -444,16 +444,11 @@ defineExpose({
 
 <style module lang="scss">
 .parameterItem {
-	--delete-option-width: 22px;
 	display: flex;
 	padding: 0 0 0 var(--spacing-s);
 
 	.parameterInput {
-		width: calc(100% - var(--delete-option-width));
-	}
-
-	.parameterInput:first-child {
-		margin-left: var(--delete-option-width);
+		width: 100%;
 	}
 
 	&.hasIssues {

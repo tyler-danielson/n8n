@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { fireEvent, within } from '@testing-library/vue';
 import * as workflowHelpers from '@/composables/useWorkflowHelpers';
 import AssignmentCollection from './AssignmentCollection.vue';
-import { STORES } from '@n8n/stores';
+import { STORES } from '@/constants';
 import { cleanupAppModals, createAppModals, SETTINGS_STORE_DEFAULT_STATE } from '@/__tests__/utils';
 
 const DEFAULT_SETUP = {
@@ -107,31 +107,6 @@ describe('AssignmentCollection.vue', () => {
 		);
 	});
 
-	it('does not break with saved assignments that have no ID (legacy)', async () => {
-		const { findAllByTestId } = renderComponent({
-			props: {
-				value: {
-					assignments: [
-						{ name: 'key1', value: 'value1', type: 'string' },
-						{ name: 'key2', value: 'value2', type: 'string' },
-						{ name: 'key3', value: 'value3', type: 'string' },
-					],
-				},
-			},
-		});
-
-		let assignments = await findAllByTestId('assignment');
-
-		expect(assignments.length).toEqual(3);
-
-		// Remove 2nd assignment
-		await userEvent.click(within(assignments[1]).getByTestId('assignment-remove'));
-		assignments = await findAllByTestId('assignment');
-		expect(assignments.length).toEqual(2);
-		expect(getInput(within(assignments[0]).getByTestId('assignment-value'))).toHaveValue('value1');
-		expect(getInput(within(assignments[1]).getByTestId('assignment-value'))).toHaveValue('value3');
-	});
-
 	it('can add assignments by drag and drop (and infer type)', async () => {
 		const { getByTestId, findAllByTestId } = renderComponent();
 		const dropArea = getByTestId('drop-area');
@@ -150,70 +125,5 @@ describe('AssignmentCollection.vue', () => {
 		expect(getAssignmentType(assignments[2])).toEqual('Number');
 		expect(getAssignmentType(assignments[3])).toEqual('Object');
 		expect(getAssignmentType(assignments[4])).toEqual('Array');
-	});
-
-	describe('defaultType prop', () => {
-		it('should use string as default type when no defaultType is specified', async () => {
-			const { getByTestId, findAllByTestId } = renderComponent();
-
-			await userEvent.click(getByTestId('assignment-collection-drop-area'));
-
-			const assignments = await findAllByTestId('assignment');
-			expect(assignments.length).toBe(1);
-			expect(getAssignmentType(assignments[0])).toEqual('String');
-		});
-
-		it('should use specified defaultType when adding a new assignment manually', async () => {
-			const { getByTestId, findAllByTestId } = renderComponent({
-				props: {
-					defaultType: 'number',
-				},
-			});
-
-			await userEvent.click(getByTestId('assignment-collection-drop-area'));
-
-			const assignments = await findAllByTestId('assignment');
-			expect(assignments.length).toBe(1);
-			expect(getAssignmentType(assignments[0])).toEqual('Number');
-		});
-
-		it('should use defaultType for drag and drop when disableType is true', async () => {
-			const { getByTestId, findAllByTestId } = renderComponent({
-				props: {
-					defaultType: 'number',
-					disableType: true,
-				},
-			});
-
-			const dropArea = getByTestId('drop-area');
-
-			// Even though we're dropping a string value, it should use number type because of defaultType
-			await dropAssignment({ key: 'stringKey', value: 'stringValue', dropArea });
-
-			const assignments = await findAllByTestId('assignment');
-			expect(assignments.length).toBe(1);
-			expect(getAssignmentType(assignments[0])).toEqual('Number');
-		});
-
-		it('should respect defaultType for all assignments when provided', async () => {
-			const { getByTestId, findAllByTestId } = renderComponent({
-				props: {
-					defaultType: 'boolean',
-				},
-			});
-
-			const dropArea = getByTestId('drop-area');
-
-			await userEvent.click(getByTestId('assignment-collection-drop-area'));
-
-			await dropAssignment({ key: 'stringKey', value: 'stringValue', dropArea });
-			await dropAssignment({ key: 'numberKey', value: 25, dropArea });
-
-			const assignments = await findAllByTestId('assignment');
-			expect(assignments.length).toBe(3);
-			expect(getAssignmentType(assignments[0])).toEqual('Boolean');
-			expect(getAssignmentType(assignments[1])).toEqual('Boolean');
-			expect(getAssignmentType(assignments[2])).toEqual('Boolean');
-		});
 	});
 });

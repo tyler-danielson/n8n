@@ -1,20 +1,20 @@
 <script lang="ts" setup>
-import AnnotationTagsDropdown from '@/components/AnnotationTagsDropdown.ee.vue';
-import { useDebounce } from '@/composables/useDebounce';
-import { usePageRedirectionHelper } from '@/composables/usePageRedirectionHelper';
-import { useTelemetry } from '@/composables/useTelemetry';
-import { EnterpriseEditionFeature } from '@/constants';
+import { computed, reactive, onBeforeMount, ref } from 'vue';
 import type {
-	ExecutionFilterMetadata,
 	ExecutionFilterType,
-	IWorkflowDb,
+	ExecutionFilterMetadata,
 	IWorkflowShortResponse,
+	IWorkflowDb,
 } from '@/Interface';
 import { i18n as locale } from '@/plugins/i18n';
-import { useSettingsStore } from '@/stores/settings.store';
 import { getObjectKeys, isEmpty } from '@/utils/typesUtils';
+import { EnterpriseEditionFeature } from '@/constants';
+import { useSettingsStore } from '@/stores/settings.store';
+import { useTelemetry } from '@/composables/useTelemetry';
 import type { Placement } from '@floating-ui/core';
-import { computed, onBeforeMount, reactive, ref } from 'vue';
+import { useDebounce } from '@/composables/useDebounce';
+import AnnotationTagsDropdown from '@/components/AnnotationTagsDropdown.ee.vue';
+import { usePageRedirectionHelper } from '@/composables/usePageRedirectionHelper';
 
 export type ExecutionFilterProps = {
 	workflows?: Array<IWorkflowDb | IWorkflowShortResponse>;
@@ -162,22 +162,17 @@ onBeforeMount(() => {
 			<n8n-button
 				icon="filter"
 				type="tertiary"
-				size="medium"
-				square
 				:active="!!countSelectedFilterProps"
 				data-test-id="executions-filter-button"
-				:class="$style.filterButton"
 			>
-				<template v-if="!!countSelectedFilterProps" #default>
-					<n8n-badge
-						theme="primary"
-						class="mr-4xs"
-						data-test-id="execution-filter-badge"
-						:class="$style.filterBadge"
-					>
-						{{ countSelectedFilterProps }}
-					</n8n-badge>
-				</template>
+				<n8n-badge
+					v-if="!!countSelectedFilterProps"
+					theme="primary"
+					class="mr-4xs"
+					data-test-id="execution-filter-badge"
+					>{{ countSelectedFilterProps }}</n8n-badge
+				>
+				{{ locale.baseText('executionsList.filters') }}
 			</n8n-button>
 		</template>
 		<div data-test-id="execution-filter-form">
@@ -262,8 +257,8 @@ onBeforeMount(() => {
 				}}</label>
 				<AnnotationTagsDropdown
 					id="execution-filter-annotation-tags"
-					v-model="filter.annotationTags"
 					:placeholder="locale.baseText('workflowOpen.filterWorkflows')"
+					v-model="filter.annotationTags"
 					:create-enabled="false"
 					data-test-id="executions-filter-annotation-tags-select"
 					@update:model-value="onAnnotationTagsChange"
@@ -406,17 +401,6 @@ onBeforeMount(() => {
 
 .tooltipIcon {
 	color: var(--color-text-light);
-}
-
-.filterButton {
-	position: relative;
-
-	.filterBadge {
-		position: absolute;
-		top: 0;
-		right: -4px;
-		transform: translate(50%, -50%);
-	}
 }
 </style>
 

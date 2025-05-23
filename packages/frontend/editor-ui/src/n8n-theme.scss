@@ -15,7 +15,7 @@
 }
 .text-light {
 	color: $custom-font-light;
-	font-weight: var(--font-weight-regular);
+	font-weight: 400;
 }
 
 // Dialog
@@ -52,7 +52,7 @@
 			width: 50px;
 			.el-dialog__close {
 				color: var(--color-foreground-xlight);
-				font-weight: var(--font-weight-regular);
+				font-weight: 400;
 			}
 			.el-dialog__close:hover {
 				transform: scale(1.2);
@@ -121,7 +121,7 @@
 	outline: none;
 }
 .el-tabs__item.is-active {
-	font-weight: var(--font-weight-bold);
+	font-weight: bold;
 }
 
 .el-tabs__content {
@@ -179,14 +179,14 @@
 .el-notification__content {
 	text-align: left;
 	word-break: break-word;
-	max-height: 30vh;
+	max-height: 60vh;
 	overflow-y: auto;
 }
 
 .tags-container {
 	.el-select-tags-wrapper .el-tag {
 		font-size: 12px;
-		font-weight: var(--font-weight-regular);
+		font-weight: 400;
 		display: flex;
 		align-items: center;
 

@@ -28,4 +28,11 @@ describe('Logo', () => {
 		});
 		expect(wrapper.html()).toMatchSnapshot();
 	});
+
+	it('renders the releaseChannelTag for non-stable releaseChannel', async () => {
+		const wrapper = renderComponent({
+			props: { location: 'authView', releaseChannel: 'dev' },
+		});
+		expect(wrapper.html()).toMatchSnapshot();
+	});
 });

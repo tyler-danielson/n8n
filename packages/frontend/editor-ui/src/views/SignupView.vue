@@ -139,7 +139,9 @@ async function onSubmit(values: { [key: string]: string | boolean }) {
 }
 
 function getQueryParameter(key: 'inviterId' | 'inviteeId'): string | null {
-	return !route.query[key] || typeof route.query[key] !== 'string' ? null : route.query[key];
+	return !route.query[key] || typeof route.query[key] !== 'string'
+		? null
+		: (route.query[key] as string);
 }
 </script>
 

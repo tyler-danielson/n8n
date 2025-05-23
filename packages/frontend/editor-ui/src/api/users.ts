@@ -1,5 +1,4 @@
 import type {
-	LoginRequestDto,
 	PasswordUpdateRequestDto,
 	SettingsUpdateRequestDto,
 	UserUpdateRequestDto,
@@ -22,7 +21,7 @@ export async function loginCurrentUser(
 
 export async function login(
 	context: IRestApiContext,
-	params: LoginRequestDto,
+	params: { email: string; password: string; mfaCode?: string; mfaRecoveryToken?: string },
 ): Promise<CurrentUserResponse> {
 	return await makeRestApiRequest(context, 'POST', '/login', params);
 }

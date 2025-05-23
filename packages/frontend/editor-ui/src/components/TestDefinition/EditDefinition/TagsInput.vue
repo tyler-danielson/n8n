@@ -1,50 +1,42 @@
 <script setup lang="ts">
 import { useI18n } from '@/composables/useI18n';
 import type { ITag } from '@/Interface';
-import { createEventBus } from '@n8n/utils/event-bus';
+import { createEventBus } from 'n8n-design-system';
 import { computed } from 'vue';
-import type { EditableField } from '../types';
 
 export interface TagsInputProps {
-	modelValue: EditableField<string[]>;
+	modelValue?: {
+		isEditing: boolean;
+		appliedTagIds: string[];
+	};
 	allTags: ITag[];
 	tagsById: Record<string, ITag>;
 	isLoading: boolean;
-	startEditing: (field: 'tags') => void;
-	saveChanges: (field: 'tags') => void;
-	cancelEditing: (field: 'tags') => void;
-	createTag?: (name: string) => Promise<ITag>;
+	startEditing: (field: string) => void;
+	saveChanges: (field: string) => void;
+	cancelEditing: (field: string) => void;
 }
 
 const props = withDefaults(defineProps<TagsInputProps>(), {
 	modelValue: () => ({
 		isEditing: false,
-		value: [],
-		tempValue: [],
+		appliedTagIds: [],
 	}),
-	createTag: undefined,
 });
 
 const emit = defineEmits<{ 'update:modelValue': [value: TagsInputProps['modelValue']] }>();
 
 const locale = useI18n();
 const tagsEventBus = createEventBus();
-
-/**
- * Compute the tag name by ID
- */
 const getTagName = computed(() => (tagId: string) => {
 	return props.tagsById[tagId]?.name ?? '';
 });
 
-/**
- * Update the tempValue of the tags when the dropdown changes.
- * This does not finalize the changes; that happens on blur or hitting enter.
- */
 function updateTags(tags: string[]) {
+	const newTags = tags[0] ? [tags[0]] : [];
 	emit('update:modelValue', {
 		...props.modelValue,
-		tempValue: tags,
+		appliedTagIds: newTags,
 	});
 }
 </script>
@@ -56,13 +48,12 @@ function updateTags(tags: string[]) {
 			:bold="false"
 			size="small"
 		>
-			<!-- Read-only view -->
 			<div v-if="!modelValue.isEditing" :class="$style.tagsRead" @click="startEditing('tags')">
-				<n8n-text v-if="modelValue.value.length === 0" size="small">
+				<n8n-text v-if="modelValue.appliedTagIds.length === 0" size="small">
 					{{ locale.baseText('testDefinition.edit.selectTag') }}
 				</n8n-text>
 				<n8n-tag
-					v-for="tagId in modelValue.value"
+					v-for="tagId in modelValue.appliedTagIds"
 					:key="tagId"
 					:text="getTagName(tagId)"
 					data-test-id="evaluation-tag-field"
@@ -75,26 +66,24 @@ function updateTags(tags: string[]) {
 					transparent
 				/>
 			</div>
-
-			<!-- Editing view -->
 			<TagsDropdown
 				v-else
-				:model-value="modelValue.tempValue"
+				:model-value="modelValue.appliedTagIds"
 				:placeholder="locale.baseText('executionAnnotationView.chooseOrCreateATag')"
-				:create-enabled="modelValue.tempValue.length === 0"
+				:create-enabled="false"
 				:all-tags="allTags"
 				:is-loading="isLoading"
 				:tags-by-id="tagsById"
 				data-test-id="workflow-tags-dropdown"
 				:event-bus="tagsEventBus"
-				:create-tag="createTag"
-				:manage-enabled="false"
-				:multiple-limit="1"
 				@update:model-value="updateTags"
 				@esc="cancelEditing('tags')"
 				@blur="saveChanges('tags')"
 			/>
 		</n8n-input-label>
+		<n8n-text size="small" color="text-light">{{
+			locale.baseText('testDefinition.edit.tagsHelpText')
+		}}</n8n-text>
 	</div>
 </template>
 

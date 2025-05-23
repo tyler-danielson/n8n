@@ -29,7 +29,7 @@ export default {
 	font-size: 11px;
 	line-height: 18px;
 	max-height: 18px;
-	font-weight: var(--font-weight-regular);
+	font-weight: 400;
 	display: flex;
 	align-items: center;
 	padding: 2px 4px;

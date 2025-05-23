@@ -3,7 +3,6 @@ import {
 	onBeforeUnmount,
 	onMounted,
 	ref,
-	toRef,
 	toValue,
 	watch,
 	watchEffect,
@@ -23,7 +22,11 @@ import { useWorkflowHelpers } from '@/composables/useWorkflowHelpers';
 import { highlighter } from '@/plugins/codemirror/resolvableHighlighter';
 import { closeCursorInfoBox } from '@/plugins/codemirror/tooltips/InfoBoxTooltip';
 import type { Html, Plaintext, RawSegment, Resolvable, Segment } from '@/types/expressions';
-import { getExpressionErrorMessage, getResolvableState } from '@/utils/expressions';
+import {
+	getExpressionErrorMessage,
+	getResolvableState,
+	isEmptyExpression,
+} from '@/utils/expressions';
 import { closeCompletion, completionStatus } from '@codemirror/autocomplete';
 import {
 	Compartment,
@@ -38,7 +41,6 @@ import { useRouter } from 'vue-router';
 import { useI18n } from '../composables/useI18n';
 import { useWorkflowsStore } from '../stores/workflows.store';
 import { useAutocompleteTelemetry } from './useAutocompleteTelemetry';
-import { ignoreUpdateAnnotation } from '../utils/forceParse';
 
 export const useExpressionEditor = ({
 	editorRef,
@@ -48,16 +50,14 @@ export const useExpressionEditor = ({
 	skipSegments = [],
 	autocompleteTelemetry,
 	isReadOnly = false,
-	onChange = () => {},
 }: {
-	editorRef: MaybeRefOrGetter<HTMLElement | undefined>;
+	editorRef: Ref<HTMLElement | undefined>;
 	editorValue?: MaybeRefOrGetter<string>;
 	extensions?: MaybeRefOrGetter<Extension[]>;
 	additionalData?: MaybeRefOrGetter<IDataObject>;
 	skipSegments?: MaybeRefOrGetter<string[]>;
 	autocompleteTelemetry?: MaybeRefOrGetter<{ enabled: true; parameterPath: string }>;
 	isReadOnly?: MaybeRefOrGetter<boolean>;
-	onChange?: (viewUpdate: ViewUpdate) => void;
 }) => {
 	const ndvStore = useNDVStore();
 	const workflowsStore = useWorkflowsStore();
@@ -73,9 +73,6 @@ export const useExpressionEditor = ({
 	const telemetryExtensions = ref<Compartment>(new Compartment());
 	const autocompleteStatus = ref<'pending' | 'active' | null>(null);
 	const dragging = ref(false);
-	const hasChanges = ref(false);
-
-	const emitChanges = debounce(onChange, 300);
 
 	const updateSegments = (): void => {
 		const state = editor.value?.state;
@@ -132,12 +129,6 @@ export const useExpressionEditor = ({
 
 			return acc;
 		}, []);
-		if (
-			segments.value.length === 1 &&
-			segments.value[0]?.kind === 'resolvable' &&
-			segments.value[0]?.resolved === ''
-		)
-			segments.value[0].resolved = i18n.baseText('expressionModalInput.empty');
 	};
 
 	function readEditorValue(): string {
@@ -165,15 +156,9 @@ export const useExpressionEditor = ({
 		autocompleteStatus.value = completionStatus(viewUpdate.view.state);
 		updateSelection(viewUpdate);
 
-		const shouldIgnoreUpdate = viewUpdate.transactions.some((tr) =>
-			tr.annotation(ignoreUpdateAnnotation),
-		);
+		if (!viewUpdate.docChanged) return;
 
-		if (viewUpdate.docChanged && !shouldIgnoreUpdate) {
-			hasChanges.value = true;
-			emitChanges(viewUpdate);
-			debouncedUpdateSegments();
-		}
+		debouncedUpdateSegments();
 	}
 
 	function blur() {
@@ -191,7 +176,7 @@ export const useExpressionEditor = ({
 		dragging.value = false;
 	}
 
-	watch(toRef(editorRef), () => {
+	watch(editorRef, () => {
 		const parent = toValue(editorRef);
 
 		if (!parent) return;
@@ -275,8 +260,6 @@ export const useExpressionEditor = ({
 
 	onBeforeUnmount(() => {
 		document.removeEventListener('click', blurOnClickOutside);
-		debouncedUpdateSegments.flush();
-		emitChanges.flush();
 		editor.value?.destroy();
 	});
 
@@ -329,6 +312,14 @@ export const useExpressionEditor = ({
 			result.resolved = `[${getExpressionErrorMessage(error, hasRunData)}]`;
 			result.error = true;
 			result.fullError = error;
+		}
+
+		if (result.resolved === '') {
+			result.resolved = i18n.baseText('expressionModalInput.empty');
+		}
+
+		if (result.resolved === undefined && isEmptyExpression(resolvable)) {
+			result.resolved = i18n.baseText('expressionModalInput.empty');
 		}
 
 		if (result.resolved === undefined) {
@@ -477,6 +468,5 @@ export const useExpressionEditor = ({
 		select,
 		selectAll,
 		focus,
-		hasChanges,
 	};
 };

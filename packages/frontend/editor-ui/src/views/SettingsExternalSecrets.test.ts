@@ -1,7 +1,6 @@
 import { createTestingPinia } from '@pinia/testing';
 import { merge } from 'lodash-es';
-import { EnterpriseEditionFeature } from '@/constants';
-import { STORES } from '@n8n/stores';
+import { EnterpriseEditionFeature, STORES } from '@/constants';
 import { SETTINGS_STORE_DEFAULT_STATE } from '@/__tests__/utils';
 import SettingsExternalSecrets from '@/views/SettingsExternalSecrets.vue';
 import { createComponentRenderer } from '@/__tests__/render';

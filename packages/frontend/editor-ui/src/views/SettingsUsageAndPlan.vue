@@ -9,7 +9,7 @@ import { useUIStore } from '@/stores/ui.store';
 import { useToast } from '@/composables/useToast';
 import { useDocumentTitle } from '@/composables/useDocumentTitle';
 import { hasPermission } from '@/utils/rbac/permissions';
-import N8nInfoTip from '@n8n/design-system/components/N8nInfoTip';
+import N8nInfoTip from 'n8n-design-system/components/N8nInfoTip';
 import { COMMUNITY_PLUS_ENROLLMENT_MODAL } from '@/constants';
 import { useUsersStore } from '@/stores/users.store';
 import { getResourcePermissions } from '@/permissions';
@@ -148,12 +148,7 @@ const onDialogOpened = () => {
 };
 
 const openCommunityRegisterModal = () => {
-	uiStore.openModalWithData({
-		name: COMMUNITY_PLUS_ENROLLMENT_MODAL,
-		data: {
-			customHeading: undefined,
-		},
-	});
+	uiStore.openModal(COMMUNITY_PLUS_ENROLLMENT_MODAL);
 };
 </script>
 

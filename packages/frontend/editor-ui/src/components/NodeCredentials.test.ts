@@ -1,6 +1,5 @@
 import { describe, it } from 'vitest';
-import { screen } from '@testing-library/vue';
-import userEvent from '@testing-library/user-event';
+import { fireEvent, screen } from '@testing-library/vue';
 import { createTestingPinia } from '@pinia/testing';
 import NodeCredentials from './NodeCredentials.vue';
 import type { RenderOptions } from '@/__tests__/render';
@@ -9,7 +8,6 @@ import { useCredentialsStore } from '@/stores/credentials.store';
 import { mockedStore } from '@/__tests__/utils';
 import type { INodeUi } from '@/Interface';
 import { useNDVStore } from '@/stores/ndv.store';
-import { useUIStore } from '../stores/ui.store';
 
 const httpNode: INodeUi = {
 	parameters: {
@@ -55,7 +53,7 @@ const openAiNode: INodeUi = {
 
 describe('NodeCredentials', () => {
 	const defaultRenderOptions: RenderOptions = {
-		pinia: createTestingPinia({ stubActions: false }),
+		pinia: createTestingPinia(),
 		props: {
 			overrideCredType: 'openAiApi',
 			node: httpNode,
@@ -69,7 +67,6 @@ describe('NodeCredentials', () => {
 
 	const credentialsStore = mockedStore(useCredentialsStore);
 	const ndvStore = mockedStore(useNDVStore);
-	const uiStore = mockedStore(useUIStore);
 
 	beforeAll(() => {
 		credentialsStore.state.credentialTypes = {
@@ -123,7 +120,7 @@ describe('NodeCredentials', () => {
 
 		const credentialsSelect = screen.getByTestId('node-credentials-select');
 
-		await userEvent.click(credentialsSelect);
+		await fireEvent.click(credentialsSelect);
 
 		expect(screen.queryByText('OpenAi account')).toBeInTheDocument();
 	});
@@ -153,7 +150,7 @@ describe('NodeCredentials', () => {
 
 		const credentialsSelect = screen.getByTestId('node-credentials-select');
 
-		await userEvent.click(credentialsSelect);
+		await fireEvent.click(credentialsSelect);
 
 		expect(screen.queryByText('OpenAi account')).toBeInTheDocument();
 		expect(screen.queryByText('OpenAi account 2')).not.toBeInTheDocument();
@@ -191,69 +188,9 @@ describe('NodeCredentials', () => {
 
 		const credentialsSelect = screen.getByTestId('node-credentials-select');
 
-		await userEvent.click(credentialsSelect);
+		await fireEvent.click(credentialsSelect);
 
 		expect(screen.queryByText('OpenAi account')).toBeInTheDocument();
 		expect(screen.queryByText('OpenAi account 2')).toBeInTheDocument();
-	});
-
-	it('should filter available credentials in the dropdown', async () => {
-		ndvStore.activeNode = httpNode;
-		credentialsStore.state.credentials = {
-			c8vqdPpPClh4TgIO: {
-				id: 'c8vqdPpPClh4TgIO',
-				name: 'OpenAi account',
-				type: 'openAiApi',
-				isManaged: false,
-				createdAt: '',
-				updatedAt: '',
-			},
-			test: {
-				id: 'test',
-				name: 'Test OpenAi account',
-				type: 'openAiApi',
-				isManaged: false,
-				createdAt: '',
-				updatedAt: '',
-			},
-		};
-
-		renderComponent();
-
-		const credentialsSelect = screen.getByTestId('node-credentials-select');
-
-		await userEvent.click(credentialsSelect);
-
-		expect(screen.queryByText('OpenAi account')).toBeInTheDocument();
-		expect(screen.queryByText('Test OpenAi account')).toBeInTheDocument();
-
-		const credentialSearch = credentialsSelect.querySelector('input') as HTMLElement;
-		await userEvent.type(credentialSearch, 'test');
-
-		expect(screen.queryByText('OpenAi account')).not.toBeInTheDocument();
-		expect(screen.queryByText('Test OpenAi account')).toBeInTheDocument();
-	});
-
-	it('should open the new credential modal when clicked', async () => {
-		ndvStore.activeNode = httpNode;
-		credentialsStore.state.credentials = {
-			c8vqdPpPClh4TgIO: {
-				id: 'c8vqdPpPClh4TgIO',
-				name: 'OpenAi account',
-				type: 'openAiApi',
-				isManaged: false,
-				createdAt: '',
-				updatedAt: '',
-			},
-		};
-
-		renderComponent();
-
-		const credentialsSelect = screen.getByTestId('node-credentials-select');
-
-		await userEvent.click(credentialsSelect);
-		await userEvent.click(screen.getByTestId('node-credentials-select-item-new'));
-
-		expect(uiStore.openNewCredential).toHaveBeenCalledWith('openAiApi', true);
 	});
 });

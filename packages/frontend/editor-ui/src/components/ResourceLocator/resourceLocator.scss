@@ -4,7 +4,7 @@ $--mode-selector-width: 92px;
 	--input-background-color: initial;
 	--input-font-color: initial;
 	--input-border-color: initial;
-	width: $--mode-selector-width;
+	flex-basis: $--mode-selector-width;
 
 	input {
 		border-radius: var(--border-radius-base) 0 0 var(--border-radius-base);
@@ -21,39 +21,12 @@ $--mode-selector-width: 92px;
 	}
 }
 
-.inputField {
-	flex-grow: 1;
-	position: relative;
-}
-
-.fromAiOverrideField {
-	position: relative;
-
-	border-top-left-radius: 0;
-	border-bottom-left-radius: 0;
-}
-
-.overrideButtonInline {
-	> button {
-		border-top-left-radius: 0;
-		border-bottom-left-radius: 0;
-	}
-	position: relative;
-}
-
-.rightNoCorner > * {
-	--input-border-bottom-right-radius: 0;
-	--input-border-top-right-radius: 0;
-}
-
 .resourceLocator {
-	display: inline-flex;
-	flex-wrap: nowrap;
-	width: 100%;
+	display: flex;
+	flex-wrap: wrap;
 	position: relative;
 
 	--input-issues-width: 28px;
-	--input-override-width: 30px;
 
 	.inputContainer {
 		display: flex;
@@ -65,10 +38,6 @@ $--mode-selector-width: 92px;
 
 		> div {
 			width: 100%;
-
-			> div {
-				display: flex;
-			}
 		}
 	}
 
@@ -83,23 +52,13 @@ $--mode-selector-width: 92px;
 		border-radius: var(--border-radius-base);
 	}
 
-	.backgroundOverride {
-		right: var(--input-override-width);
-	}
-
-	.backgroundWithIssuesAndShowResourceLink {
-		right: 47px;
-	}
-
 	&.multipleModes {
 		.inputContainer {
 			display: flex;
 			align-items: center;
-			width: calc(100% - $--mode-selector-width);
+			flex-basis: calc(100% - $--mode-selector-width);
 			flex-grow: 1;
-		}
 
-		.inputContainerInputCorners {
 			input {
 				border-radius: 0 var(--border-radius-base) var(--border-radius-base) 0;
 			}
@@ -144,27 +103,10 @@ $--mode-selector-width: 92px;
 	cursor: pointer;
 }
 
-.errorContainer,
-.errorDetails {
-	display: flex;
-	gap: var(--spacing-s);
-	flex-direction: column;
-}
-
-.errorContainer {
-	width: 80%;
-	align-items: center;
-	text-align: center;
-}
-
-.errorDescription {
-	text-align: left;
-	margin: 0;
+.error {
+	max-width: 170px;
 	word-break: normal;
-}
-
-.credential-link {
-	font-size: var(--font-size-2xs);
+	text-align: center;
 }
 
 .openResourceLink {

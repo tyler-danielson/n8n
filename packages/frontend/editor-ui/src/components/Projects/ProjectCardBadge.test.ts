@@ -1,16 +1,8 @@
 import { createComponentRenderer } from '@/__tests__/render';
 import ProjectCardBadge from '@/components/Projects/ProjectCardBadge.vue';
-import { truncate } from '@n8n/utils/string/truncate';
+import { truncate } from 'n8n-design-system';
 
-const renderComponent = createComponentRenderer(ProjectCardBadge, {
-	global: {
-		stubs: {
-			'router-link': {
-				template: '<div><slot /></div>',
-			},
-		},
-	},
-});
+const renderComponent = createComponentRenderer(ProjectCardBadge);
 
 describe('ProjectCardBadge', () => {
 	it('should show "Personal" badge if there is no homeProject', () => {
@@ -60,7 +52,7 @@ describe('ProjectCardBadge', () => {
 			},
 		});
 
-		expect(getByText('+3')).toBeVisible();
+		expect(getByText('+ 3')).toBeVisible();
 	});
 
 	test.each([

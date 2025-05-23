@@ -20,8 +20,8 @@ import {
 	defaultMessageEventBusDestinationSyslogOptions,
 	defaultMessageEventBusDestinationSentryOptions,
 } from 'n8n-workflow';
-import type { EventBus } from '@n8n/utils/event-bus';
-import { createEventBus } from '@n8n/utils/event-bus';
+import type { EventBus } from 'n8n-design-system';
+import { createEventBus } from 'n8n-design-system/utils';
 
 import { useLogStreamingStore } from '@/stores/logStreaming.store';
 import { useNDVStore } from '@/stores/ndv.store';
@@ -40,7 +40,7 @@ import InlineNameEdit from '@/components/InlineNameEdit.vue';
 import SaveButton from '@/components/SaveButton.vue';
 import EventSelection from '@/components/SettingsLogStreaming/EventSelection.ee.vue';
 import { useTelemetry } from '@/composables/useTelemetry';
-import { useRootStore } from '@n8n/stores/useRootStore';
+import { useRootStore } from '@/stores/root.store';
 
 import {
 	webhookModalDescription,
@@ -566,7 +566,7 @@ function callEventBus(event: string, data: unknown) {
 
 .cardTitle {
 	font-size: 14px;
-	font-weight: var(--font-weight-bold);
+	font-weight: bold;
 }
 
 .header {

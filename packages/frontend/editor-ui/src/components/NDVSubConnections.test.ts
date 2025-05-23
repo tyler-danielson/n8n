@@ -4,17 +4,17 @@ import { setActivePinia } from 'pinia';
 import { createTestingPinia } from '@pinia/testing';
 import type { INodeUi } from '@/Interface';
 import type { INodeTypeDescription, WorkflowParameters } from 'n8n-workflow';
-import { NodeConnectionTypes, Workflow } from 'n8n-workflow';
+import { NodeConnectionType, Workflow } from 'n8n-workflow';
 
 const nodeType: INodeTypeDescription = {
 	displayName: 'OpenAI',
 	name: '@n8n/n8n-nodes-langchain.openAi',
 	version: [1],
 	inputs: [
-		{ type: NodeConnectionTypes.Main },
-		{ type: NodeConnectionTypes.AiTool, displayName: 'Tools' },
+		{ type: NodeConnectionType.Main },
+		{ type: NodeConnectionType.AiTool, displayName: 'Tools' },
 	],
-	outputs: [NodeConnectionTypes.Main],
+	outputs: [NodeConnectionType.Main],
 	credentials: [
 		{
 			name: 'openAiApi',

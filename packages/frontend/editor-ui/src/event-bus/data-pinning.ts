@@ -1,4 +1,4 @@
-import { createEventBus } from '@n8n/utils/event-bus';
+import { createEventBus } from 'n8n-design-system/utils';
 import type { IPinData } from 'n8n-workflow';
 
 export type DataPinningDiscoveryEvent = {

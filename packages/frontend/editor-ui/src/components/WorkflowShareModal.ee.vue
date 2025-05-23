@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, watch, onMounted, ref } from 'vue';
-import { createEventBus } from '@n8n/utils/event-bus';
+import { createEventBus } from 'n8n-design-system/utils';
 
 import Modal from './Modal.vue';
 import {

@@ -1,35 +1,16 @@
 import { createTestNode, createTestWorkflowObject } from '@/__tests__/mocks';
 import * as workflowHelpers from '@/composables/useWorkflowHelpers';
-import * as ndvStore from '@/stores/ndv.store';
-import { CompletionContext, insertCompletionText } from '@codemirror/autocomplete';
 import { javascriptLanguage } from '@codemirror/lang-javascript';
-import { EditorState } from '@codemirror/state';
-import { EditorView } from '@codemirror/view';
-import { NodeConnectionTypes, type IConnections } from 'n8n-workflow';
+import { autocompletableNodeNames, expressionWithFirstItem } from './utils';
 import type { MockInstance } from 'vitest';
-import { autocompletableNodeNames, expressionWithFirstItem, stripExcessParens } from './utils';
+import * as ndvStore from '@/stores/ndv.store';
+import { NodeConnectionType, type IConnections } from 'n8n-workflow';
 
 vi.mock('@/composables/useWorkflowHelpers', () => ({
 	useWorkflowHelpers: vi.fn().mockReturnValue({
 		getCurrentWorkflow: vi.fn(),
 	}),
 }));
-
-const editorFromString = (docWithCursor: string) => {
-	const cursorPosition = docWithCursor.indexOf('|');
-
-	const doc = docWithCursor.slice(0, cursorPosition) + docWithCursor.slice(cursorPosition + 1);
-
-	const state = EditorState.create({
-		doc,
-		selection: { anchor: cursorPosition },
-	});
-
-	return {
-		context: new CompletionContext(state, cursorPosition, false),
-		view: new EditorView({ state, doc }),
-	};
-};
 
 describe('completion utils', () => {
 	describe('expressionWithFirstItem', () => {
@@ -83,13 +64,13 @@ describe('completion utils', () => {
 			];
 			const connections = {
 				[nodes[0].name]: {
-					[NodeConnectionTypes.Main]: [
-						[{ node: nodes[1].name, type: NodeConnectionTypes.Main, index: 0 }],
+					[NodeConnectionType.Main]: [
+						[{ node: nodes[1].name, type: NodeConnectionType.Main, index: 0 }],
 					],
 				},
 				[nodes[1].name]: {
-					[NodeConnectionTypes.Main]: [
-						[{ node: nodes[2].name, type: NodeConnectionTypes.Main, index: 0 }],
+					[NodeConnectionType.Main]: [
+						[{ node: nodes[2].name, type: NodeConnectionType.Main, index: 0 }],
 					],
 				},
 			};
@@ -116,13 +97,13 @@ describe('completion utils', () => {
 			];
 			const connections: IConnections = {
 				[nodes[0].name]: {
-					[NodeConnectionTypes.Main]: [
-						[{ node: nodes[1].name, type: NodeConnectionTypes.Main, index: 0 }],
+					[NodeConnectionType.Main]: [
+						[{ node: nodes[1].name, type: NodeConnectionType.Main, index: 0 }],
 					],
 				},
 				[nodes[2].name]: {
-					[NodeConnectionTypes.AiMemory]: [
-						[{ node: nodes[1].name, type: NodeConnectionTypes.AiMemory, index: 0 }],
+					[NodeConnectionType.AiMemory]: [
+						[{ node: nodes[1].name, type: NodeConnectionType.AiMemory, index: 0 }],
 					],
 				},
 			};
@@ -139,43 +120,6 @@ describe('completion utils', () => {
 			ndvStoreMock.mockReturnValue({ activeNode: nodes[2] });
 
 			expect(autocompletableNodeNames()).toEqual(['Normal Node']);
-		});
-	});
-
-	describe('stripExcessParens', () => {
-		test.each([
-			{
-				doc: '$(|',
-				completion: { label: "$('Node Name')" },
-				expected: "$('Node Name')",
-			},
-			{
-				doc: '$(|)',
-				completion: { label: "$('Node Name')" },
-				expected: "$('Node Name')",
-			},
-			{
-				doc: "$('|')",
-				completion: { label: "$('Node Name')" },
-				expected: "$('Node Name')",
-			},
-			{
-				doc: "$('No|')",
-				completion: { label: "$('Node Name')" },
-				expected: "$('Node Name')",
-			},
-		])('should complete $doc to $expected', ({ doc, completion, expected }) => {
-			const { context, view } = editorFromString(doc);
-			const result = stripExcessParens(context)(completion);
-			const from = 0;
-			const to = doc.indexOf('|');
-			if (typeof result.apply === 'function') {
-				result.apply(view, completion, from, to);
-			} else {
-				view.dispatch(insertCompletionText(view.state, completion.label, from, to));
-			}
-
-			expect(view.state.doc.toString()).toEqual(expected);
 		});
 	});
 });

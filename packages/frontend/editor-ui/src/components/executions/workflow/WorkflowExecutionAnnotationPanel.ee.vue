@@ -3,17 +3,15 @@ import { ref, computed } from 'vue';
 import type { AnnotationVote, ExecutionSummary } from 'n8n-workflow';
 import { useExecutionsStore } from '@/stores/executions.store';
 import AnnotationTagsDropdown from '@/components/AnnotationTagsDropdown.ee.vue';
-import { createEventBus } from '@n8n/utils/event-bus';
+import { createEventBus } from 'n8n-design-system';
 import VoteButtons from '@/components/executions/workflow/VoteButtons.vue';
 import { useToast } from '@/composables/useToast';
 import { useI18n } from '@/composables/useI18n';
-import { useTelemetry } from '@/composables/useTelemetry';
 
 const executionsStore = useExecutionsStore();
 
 const { showError } = useToast();
 const i18n = useI18n();
-const telemetry = useTelemetry();
 
 const tagsEventBus = createEventBus();
 const isTagsEditEnabled = ref(false);
@@ -83,13 +81,6 @@ const onTagsBlur = async () => {
 
 	try {
 		await executionsStore.annotateExecution(activeExecution.value.id, { tags: newTagIds });
-
-		if (newTagIds.length > 0) {
-			telemetry.track('User added execution annotation tag', {
-				tag_ids: newTagIds,
-				execution_id: activeExecution.value.id,
-			});
-		}
 	} catch (e) {
 		showError(e, 'executionAnnotationView.tag.error');
 	}
@@ -177,7 +168,7 @@ const onTagsEditEsc = () => {
 			>
 				<div
 					v-for="attr in Object.keys(activeExecution?.customData)"
-					:key="attr"
+					v-bind:key="attr"
 					:class="$style.customDataEntry"
 				>
 					<n8n-text :class="$style.key" size="small" color="text-base">
@@ -278,7 +269,7 @@ const onTagsEditEsc = () => {
 	}
 
 	.key {
-		font-weight: var(--font-weight-bold);
+		font-weight: bold;
 	}
 }
 

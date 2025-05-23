@@ -4,8 +4,6 @@ import TitledList from '@/components/TitledList.vue';
 import { useNodeHelpers } from '@/composables/useNodeHelpers';
 import { useCanvasNode } from '@/composables/useCanvasNode';
 import { useI18n } from '@/composables/useI18n';
-import { CanvasNodeDirtiness, CanvasNodeRenderType } from '@/types';
-import { N8nTooltip } from '@n8n/design-system';
 
 const nodeHelpers = useNodeHelpers();
 const i18n = useI18n();
@@ -16,17 +14,13 @@ const {
 	hasIssues,
 	executionStatus,
 	executionWaiting,
-	executionRunning,
+	executionRunningThrottled,
 	hasRunData,
 	runDataIterations,
 	isDisabled,
-	render,
 } = useCanvasNode();
 
 const hideNodeIssues = computed(() => false); // @TODO Implement this
-const dirtiness = computed(() =>
-	render.value.type === CanvasNodeRenderType.Default ? render.value.options.dirtiness : undefined,
-);
 </script>
 
 <template>
@@ -55,16 +49,6 @@ const dirtiness = computed(() =>
 			<FontAwesomeIcon icon="sync-alt" spin />
 		</div>
 	</div>
-	<div v-else-if="executionStatus === 'unknown'">
-		<!-- Do nothing, unknown means the node never executed -->
-	</div>
-	<div
-		v-else-if="executionRunning || executionStatus === 'running'"
-		data-test-id="canvas-node-status-running"
-		:class="[$style.status, $style.running]"
-	>
-		<FontAwesomeIcon icon="sync-alt" spin />
-	</div>
 	<div
 		v-else-if="hasPinnedData && !nodeHelpers.isProductionExecutionPreview.value && !isDisabled"
 		data-test-id="canvas-node-status-pinned"
@@ -72,22 +56,15 @@ const dirtiness = computed(() =>
 	>
 		<FontAwesomeIcon icon="thumbtack" />
 	</div>
-	<div v-else-if="dirtiness !== undefined">
-		<N8nTooltip :show-after="500" placement="bottom">
-			<template #content>
-				{{
-					i18n.baseText(
-						dirtiness === CanvasNodeDirtiness.PARAMETERS_UPDATED
-							? 'node.dirty'
-							: 'node.subjectToChange',
-					)
-				}}
-			</template>
-			<div data-test-id="canvas-node-status-warning" :class="[$style.status, $style.warning]">
-				<FontAwesomeIcon icon="triangle" />
-				<span v-if="runDataIterations > 1" :class="$style.count"> {{ runDataIterations }}</span>
-			</div>
-		</N8nTooltip>
+	<div v-else-if="executionStatus === 'unknown'">
+		<!-- Do nothing, unknown means the node never executed -->
+	</div>
+	<div
+		v-else-if="executionRunningThrottled || executionStatus === 'running'"
+		data-test-id="canvas-node-status-running"
+		:class="[$style.status, $style.running]"
+	>
+		<FontAwesomeIcon icon="sync-alt" spin />
 	</div>
 	<div
 		v-else-if="hasRunData"
@@ -104,10 +81,10 @@ const dirtiness = computed(() =>
 	display: flex;
 	align-items: center;
 	gap: var(--spacing-5xs);
-	font-weight: var(--font-weight-bold);
 }
 
 .runData {
+	font-weight: 600;
 	color: var(--color-success);
 }
 
@@ -148,9 +125,5 @@ const dirtiness = computed(() =>
 
 .count {
 	font-size: var(--font-size-s);
-}
-
-.warning {
-	color: var(--color-warning);
 }
 </style>

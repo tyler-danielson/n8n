@@ -7,18 +7,13 @@ import { useUsersStore } from '@/stores/users.store';
 import { useNDVStore } from '@/stores/ndv.store';
 import { usePostHog } from '@/stores/posthog.store';
 import { useProjectsStore } from '@/stores/projects.store';
-import { useRootStore } from '@n8n/stores/useRootStore';
+import { useRootStore } from '@/stores/root.store';
 import { useToast } from '@/composables/useToast';
 import { renderComponent } from '@/__tests__/render';
 import { mockedStore } from '@/__tests__/utils';
-import { useTelemetry } from '@/composables/useTelemetry';
 
 vi.mock('@/composables/useToast', () => ({
 	useToast: vi.fn(),
-}));
-
-vi.mock('@/composables/useTelemetry', () => ({
-	useTelemetry: vi.fn(),
 }));
 
 vi.mock('@/stores/settings.store', () => ({
@@ -45,7 +40,7 @@ vi.mock('@/stores/projects.store', () => ({
 	useProjectsStore: vi.fn(),
 }));
 
-vi.mock('@n8n/stores/useRootStore', () => ({
+vi.mock('@/stores/root.store', () => ({
 	useRootStore: vi.fn(),
 }));
 
@@ -60,17 +55,7 @@ const assertUserCanClaimCredits = () => {
 };
 
 const assertUserClaimedCredits = () => {
-	expect(
-		screen.getByText(
-			'Claimed 100 free OpenAI API credits! Please note these free credits are only for the following models:',
-		),
-	).toBeInTheDocument();
-
-	expect(
-		screen.getByText(
-			'gpt-4o-mini, text-embedding-3-small, dall-e-3, tts-1, whisper-1, and text-moderation-latest',
-		),
-	).toBeInTheDocument();
+	expect(screen.getByText('Claimed 100 free OpenAI API credits')).toBeInTheDocument();
 };
 
 describe('FreeAiCreditsCallout', () => {
@@ -101,7 +86,7 @@ describe('FreeAiCreditsCallout', () => {
 		});
 
 		(usePostHog as any).mockReturnValue({
-			getVariant: vi.fn().mockReturnValue('variant'),
+			isFeatureEnabled: vi.fn().mockReturnValue(true),
 		});
 
 		(useProjectsStore as any).mockReturnValue({
@@ -114,10 +99,6 @@ describe('FreeAiCreditsCallout', () => {
 
 		(useToast as any).mockReturnValue({
 			showError: vi.fn(),
-		});
-
-		(useTelemetry as any).mockReturnValue({
-			track: vi.fn(),
 		});
 	});
 
@@ -139,7 +120,6 @@ describe('FreeAiCreditsCallout', () => {
 		await fireEvent.click(claimButton);
 
 		expect(credentialsStore.claimFreeAiCredits).toHaveBeenCalledWith('test-project-id');
-		expect(useTelemetry().track).toHaveBeenCalledWith('User claimed OpenAI credits');
 		assertUserClaimedCredits();
 	});
 
@@ -170,7 +150,7 @@ describe('FreeAiCreditsCallout', () => {
 
 	it('should not be able to claim credits if user it is not in experiment', async () => {
 		(usePostHog as any).mockReturnValue({
-			getVariant: vi.fn().mockReturnValue('control'),
+			isFeatureEnabled: vi.fn().mockReturnValue(false),
 		});
 
 		renderComponent(FreeAiCreditsCallout);

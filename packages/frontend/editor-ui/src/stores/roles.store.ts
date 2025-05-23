@@ -1,13 +1,13 @@
-import type { ProjectRole, AllRolesMap } from '@n8n/permissions';
+import type { ProjectRole, RoleMap } from '@/types/roles.types';
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import * as rolesApi from '@/api/roles.api';
-import { useRootStore } from '@n8n/stores/useRootStore';
+import { useRootStore } from './root.store';
 
 export const useRolesStore = defineStore('roles', () => {
 	const rootStore = useRootStore();
 
-	const roles = ref<AllRolesMap>({
+	const roles = ref<RoleMap>({
 		global: [],
 		project: [],
 		credential: [],
@@ -22,7 +22,7 @@ export const useRolesStore = defineStore('roles', () => {
 		() => new Map(projectRoleOrder.value.map((role, idx) => [role, idx])),
 	);
 
-	const processedProjectRoles = computed<AllRolesMap['project']>(() =>
+	const processedProjectRoles = computed<RoleMap['project']>(() =>
 		roles.value.project
 			.filter((role) => projectRoleOrderMap.value.has(role.role))
 			.sort(
@@ -32,11 +32,11 @@ export const useRolesStore = defineStore('roles', () => {
 			),
 	);
 
-	const processedCredentialRoles = computed<AllRolesMap['credential']>(() =>
+	const processedCredentialRoles = computed<RoleMap['credential']>(() =>
 		roles.value.credential.filter((role) => role.role !== 'credential:owner'),
 	);
 
-	const processedWorkflowRoles = computed<AllRolesMap['workflow']>(() =>
+	const processedWorkflowRoles = computed<RoleMap['workflow']>(() =>
 		roles.value.workflow.filter((role) => role.role !== 'workflow:owner'),
 	);
 

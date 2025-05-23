@@ -1,19 +1,20 @@
 <script lang="ts" setup>
-import type { ProjectRole } from '@n8n/permissions';
 import { computed, ref, watch, onBeforeMount, onMounted, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { deepCopy } from 'n8n-workflow';
-import { N8nFormInput } from '@n8n/design-system';
+import { N8nFormInput } from 'n8n-design-system';
 import { useUsersStore } from '@/stores/users.store';
 import type { IUser } from '@/Interface';
 import { useI18n } from '@/composables/useI18n';
 import { useProjectsStore } from '@/stores/projects.store';
-import type { ProjectIcon, Project, ProjectRelation } from '@/types/projects.types';
+import type { ProjectIcon } from '@/types/projects.types';
+import { type Project, type ProjectRelation } from '@/types/projects.types';
 import { useToast } from '@/composables/useToast';
 import { VIEWS } from '@/constants';
 import ProjectDeleteDialog from '@/components/Projects/ProjectDeleteDialog.vue';
 import ProjectRoleUpgradeDialog from '@/components/Projects/ProjectRoleUpgradeDialog.vue';
 import { useRolesStore } from '@/stores/roles.store';
+import type { ProjectRole } from '@/types/roles.types';
 import { useCloudPlanStore } from '@/stores/cloudPlan.store';
 import { useTelemetry } from '@/composables/useTelemetry';
 import { useDocumentTitle } from '@/composables/useDocumentTitle';
@@ -191,8 +192,9 @@ const updateProject = async () => {
 		return;
 	}
 	try {
-		await projectsStore.updateProject(projectsStore.currentProject.id, {
-			name: formData.value.name!,
+		await projectsStore.updateProject({
+			id: projectsStore.currentProject.id,
+			name: formData.value.name,
 			icon: projectIcon.value,
 			relations: formData.value.relations.map((r: ProjectRelation) => ({
 				userId: r.id,
@@ -275,19 +277,6 @@ watch(
 	{ immediate: true },
 );
 
-// Add users property to the relation objects,
-// So that N8nUsersList has access to the full user data
-const relationUsers = computed(() =>
-	formData.value.relations.map((relation: ProjectRelation) => {
-		const user = usersStore.usersById[relation.id];
-		if (!user) return relation as ProjectRelation & IUser;
-		return {
-			...user,
-			...relation,
-		};
-	}),
-);
-
 onBeforeMount(async () => {
 	await usersStore.fetchUsers();
 });
@@ -323,7 +312,6 @@ onMounted(() => {
 						required
 						data-test-id="project-settings-name-input"
 						:class="$style['project-name-input']"
-						@enter="onSubmit"
 						@input="onNameInput"
 						@validate="isValid = $event"
 					/>
@@ -347,7 +335,7 @@ onMounted(() => {
 				</N8nUserSelect>
 				<N8nUsersList
 					:actions="[]"
-					:users="relationUsers"
+					:users="formData.relations"
 					:current-user-id="usersStore.currentUser?.id"
 					:delete-label="i18n.baseText('workflows.shareModal.list.delete')"
 				>

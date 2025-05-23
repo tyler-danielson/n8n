@@ -15,7 +15,7 @@ import type { Segment } from '@/types/expressions';
 import { startCompletion } from '@codemirror/autocomplete';
 import type { EditorState, SelectionRange } from '@codemirror/state';
 import type { IDataObject } from 'n8n-workflow';
-import { createEventBus, type EventBus } from '@n8n/utils/event-bus';
+import { createEventBus, type EventBus } from 'n8n-design-system';
 
 const isFocused = ref(false);
 const segments = ref<Segment[]>([]);
@@ -54,12 +54,6 @@ const ndvStore = useNDVStore();
 const workflowsStore = useWorkflowsStore();
 
 const isDragging = computed(() => ndvStore.isDraggableDragging);
-
-function select() {
-	if (inlineInput.value) {
-		inlineInput.value.selectAll();
-	}
-}
 
 function focus() {
 	if (inlineInput.value) {
@@ -168,7 +162,7 @@ watch(isDragging, (newIsDragging) => {
 
 onClickOutside(container, (event) => onBlur(event));
 
-defineExpose({ focus, select });
+defineExpose({ focus });
 </script>
 
 <template>
@@ -226,7 +220,6 @@ defineExpose({ focus, select });
 <style lang="scss" module>
 .expression-parameter-input {
 	position: relative;
-	flex-grow: 1;
 
 	:global(.cm-editor) {
 		background-color: var(--color-code-background);

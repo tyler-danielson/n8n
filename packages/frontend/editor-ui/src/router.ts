@@ -11,7 +11,6 @@ import { useSettingsStore } from '@/stores/settings.store';
 import { useTemplatesStore } from '@/stores/templates.store';
 import { useUIStore } from '@/stores/ui.store';
 import { useSSOStore } from '@/stores/sso.store';
-import { useTestDefinitionStore } from '@/stores/testDefinition.store.ee';
 import { EnterpriseEditionFeature, VIEWS, EDITABLE_CANVAS_VIEWS } from '@/constants';
 import { useTelemetry } from '@/composables/useTelemetry';
 import { middleware } from '@/utils/rbac/middleware';
@@ -19,18 +18,14 @@ import type { RouterMiddleware } from '@/types/router';
 import { initializeAuthenticatedFeatures, initializeCore } from '@/init';
 import { tryToParseNumber } from '@/utils/typesUtils';
 import { projectsRoutes } from '@/routes/projects.routes';
-import { insightsRoutes } from '@/features/insights/insights.router';
-import TestDefinitionRunDetailView from './views/TestDefinition/TestDefinitionRunDetailView.vue';
 
 const ChangePasswordView = async () => await import('./views/ChangePasswordView.vue');
 const ErrorView = async () => await import('./views/ErrorView.vue');
 const ForgotMyPasswordView = async () => await import('./views/ForgotMyPasswordView.vue');
 const MainHeader = async () => await import('@/components/MainHeader/MainHeader.vue');
 const MainSidebar = async () => await import('@/components/MainSidebar.vue');
-const CanvasChatSwitch = async () => await import('@/components/CanvasChat/CanvasChatSwitch.vue');
-const DemoFooter = async () =>
-	await import('@/components/CanvasChat/future/components/DemoFooter.vue');
-const NodeView = async () => await import('@/views/NodeView.vue');
+const CanvasChat = async () => await import('@/components/CanvasChat/CanvasChat.vue');
+const NodeView = async () => await import('@/views/NodeViewSwitcher.vue');
 const WorkflowExecutionsView = async () => await import('@/views/WorkflowExecutionsView.vue');
 const WorkflowExecutionsLandingPage = async () =>
 	await import('@/components/executions/workflow/WorkflowExecutionsLandingPage.vue');
@@ -64,12 +59,8 @@ const WorkflowHistory = async () => await import('@/views/WorkflowHistory.vue');
 const WorkflowOnboardingView = async () => await import('@/views/WorkflowOnboardingView.vue');
 const TestDefinitionListView = async () =>
 	await import('./views/TestDefinition/TestDefinitionListView.vue');
-const TestDefinitionNewView = async () =>
-	await import('./views/TestDefinition/TestDefinitionNewView.vue');
 const TestDefinitionEditView = async () =>
 	await import('./views/TestDefinition/TestDefinitionEditView.vue');
-const TestDefinitionRootView = async () =>
-	await import('./views/TestDefinition/TestDefinitionRootView.vue');
 
 function getTemplatesRedirect(defaultRedirect: VIEWS[keyof VIEWS]): { name: string } | false {
 	const settingsStore = useSettingsStore();
@@ -264,46 +255,48 @@ export const routes: RouteRecordRaw[] = [
 	},
 	{
 		path: '/workflow/:name/evaluation',
-		components: {
-			default: TestDefinitionRootView,
-			header: MainHeader,
-			sidebar: MainSidebar,
-		},
-		props: true,
 		meta: {
 			keepWorkflowAlive: true,
-			middleware: ['authenticated', 'custom'],
-			middlewareOptions: {
-				custom: () => useTestDefinitionStore().isFeatureEnabled,
-			},
+			middleware: ['authenticated'],
 		},
 		children: [
 			{
 				path: '',
 				name: VIEWS.TEST_DEFINITION,
-				component: TestDefinitionListView,
-				props: true,
+				components: {
+					default: TestDefinitionListView,
+					header: MainHeader,
+					sidebar: MainSidebar,
+				},
+				meta: {
+					keepWorkflowAlive: true,
+					middleware: ['authenticated'],
+				},
 			},
 			{
 				path: 'new',
 				name: VIEWS.NEW_TEST_DEFINITION,
-				component: TestDefinitionNewView,
-				props: true,
+				components: {
+					default: TestDefinitionEditView,
+					header: MainHeader,
+					sidebar: MainSidebar,
+				},
+				meta: {
+					keepWorkflowAlive: true,
+					middleware: ['authenticated'],
+				},
 			},
 			{
 				path: ':testId',
 				name: VIEWS.TEST_DEFINITION_EDIT,
-				props: true,
 				components: {
 					default: TestDefinitionEditView,
+					header: MainHeader,
+					sidebar: MainSidebar,
 				},
-			},
-			{
-				path: ':testId/runs/:runId',
-				name: VIEWS.TEST_DEFINITION_RUNS_DETAIL,
-				props: true,
-				components: {
-					default: TestDefinitionRunDetailView,
+				meta: {
+					keepWorkflowAlive: true,
+					middleware: ['authenticated'],
 				},
 			},
 		],
@@ -361,7 +354,7 @@ export const routes: RouteRecordRaw[] = [
 			default: NodeView,
 			header: MainHeader,
 			sidebar: MainSidebar,
-			footer: CanvasChatSwitch,
+			footer: CanvasChat,
 		},
 		meta: {
 			nodeView: true,
@@ -374,7 +367,6 @@ export const routes: RouteRecordRaw[] = [
 		name: VIEWS.DEMO,
 		components: {
 			default: NodeView,
-			footer: DemoFooter,
 		},
 		meta: {
 			middleware: ['authenticated'],
@@ -389,13 +381,13 @@ export const routes: RouteRecordRaw[] = [
 		},
 	},
 	{
-		path: '/workflow/:name/:nodeId?',
+		path: '/workflow/:name',
 		name: VIEWS.WORKFLOW,
 		components: {
 			default: NodeView,
 			header: MainHeader,
 			sidebar: MainSidebar,
-			footer: CanvasChatSwitch,
+			footer: CanvasChat,
 		},
 		meta: {
 			nodeView: true,
@@ -738,7 +730,6 @@ export const routes: RouteRecordRaw[] = [
 		},
 	},
 	...projectsRoutes,
-	...insightsRoutes,
 	{
 		path: '/:pathMatch(.*)*',
 		name: VIEWS.NOT_FOUND,

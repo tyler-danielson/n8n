@@ -88,26 +88,20 @@ function nodeTypeSelected(nodeTypes: string[]) {
 	closeNodeCreator(true);
 }
 
-function setWrapperRect() {
-	wrapperBoundingRect.value = wrapperRef.value?.getBoundingClientRect();
-}
-
 onMounted(() => {
-	setWrapperRect();
+	wrapperBoundingRect.value = wrapperRef.value?.getBoundingClientRect();
 
 	document.addEventListener('mousemove', onMouseMove);
-	window.addEventListener('resize', setWrapperRect);
 });
 
 onBeforeUnmount(() => {
 	document.removeEventListener('mousemove', onMouseMove);
-	window.removeEventListener('resize', setWrapperRect);
 });
 </script>
 
 <template>
 	<div v-if="!createNodeActive" :class="$style.nodeButtonsWrapper">
-		<div ref="wrapperRef" :class="$style.nodeCreatorButton" data-test-id="node-creator-plus-button">
+		<div :class="$style.nodeCreatorButton" ref="wrapperRef" data-test-id="node-creator-plus-button">
 			<KeyboardShortcutTooltip
 				:label="i18n.baseText('nodeView.openNodesPanel')"
 				:shortcut="{ keys: ['Tab'] }"

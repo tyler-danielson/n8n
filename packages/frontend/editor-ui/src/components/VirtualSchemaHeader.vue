@@ -4,75 +4,51 @@ import NodeIcon from '@/components/NodeIcon.vue';
 import { type INodeTypeDescription } from 'n8n-workflow';
 import { useI18n } from '@/composables/useI18n';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
-import { SCHEMA_PREVIEW_DOCS_URL } from '@/constants';
 
 const props = defineProps<{
 	title: string;
+	info?: string;
 	collapsable: boolean;
 	collapsed: boolean;
+	nodeType: INodeTypeDescription;
 	itemCount: number | null;
-	info?: string;
-	nodeType?: INodeTypeDescription;
-	preview?: boolean;
 }>();
 
 const i18n = useI18n();
-const isTrigger = computed(() => Boolean(props.nodeType?.group.includes('trigger')));
+const isTrigger = computed(() => props.nodeType.group.includes('trigger'));
 const emit = defineEmits<{
 	'click:toggle': [];
 }>();
 </script>
 
 <template>
-	<div class="schema-header-wrapper">
-		<div class="schema-header" data-test-id="run-data-schema-header">
-			<div class="toggle" @click.capture.stop="emit('click:toggle')">
-				<FontAwesomeIcon icon="angle-down" :class="{ 'collapse-icon': true, collapsed }" />
-			</div>
-
-			<NodeIcon
-				v-if="nodeType"
-				class="icon"
-				:class="{ ['icon-trigger']: isTrigger }"
-				:node-type="nodeType"
-				:size="12"
-			/>
-			<div class="title">
-				{{ title }}
-				<span v-if="info" class="info">{{ info }}</span>
-			</div>
-			<FontAwesomeIcon v-if="isTrigger" class="trigger-icon" icon="bolt" size="xs" />
-			<div v-if="itemCount" class="extra-info" data-test-id="run-data-schema-node-item-count">
-				{{ i18n.baseText('ndv.output.items', { interpolate: { count: itemCount } }) }}
-			</div>
-			<div v-else-if="preview" class="extra-info">
-				{{ i18n.baseText('dataMapping.schemaView.previewNode') }}
-			</div>
+	<div class="schema-header" data-test-id="run-data-schema-header">
+		<div class="toggle" @click.capture.stop="emit('click:toggle')">
+			<FontAwesomeIcon icon="angle-down" :class="{ 'collapse-icon': true, collapsed }" />
 		</div>
-		<div
-			v-if="preview && !collapsed"
-			class="notice"
-			data-test-id="schema-preview-warning"
-			@click.stop
-		>
-			<i18n-t keypath="dataMapping.schemaView.preview">
-				<template #link>
-					<N8nLink :to="SCHEMA_PREVIEW_DOCS_URL" size="small" bold>
-						{{ i18n.baseText('generic.learnMore') }}
-					</N8nLink>
-				</template>
-			</i18n-t>
+
+		<NodeIcon
+			class="icon"
+			:class="{ ['icon-trigger']: isTrigger }"
+			:node-type="nodeType"
+			:size="12"
+		/>
+		<div class="title">
+			{{ title }}
+			<span v-if="info" class="info">{{ info }}</span>
+		</div>
+		<FontAwesomeIcon v-if="isTrigger" class="trigger-icon" icon="bolt" size="xs" />
+		<div v-if="itemCount" class="item-count" data-test-id="run-data-schema-node-item-count">
+			{{ i18n.baseText('ndv.output.items', { interpolate: { count: itemCount } }) }}
 		</div>
 	</div>
 </template>
 
 <style lang="scss" scoped>
-.schema-header-wrapper {
-	padding-bottom: var(--spacing-2xs);
-}
 .schema-header {
 	display: flex;
 	align-items: center;
+	padding-bottom: var(--spacing-2xs);
 	cursor: pointer;
 }
 .toggle {
@@ -120,18 +96,9 @@ const emit = defineEmits<{
 	color: var(--color-primary);
 }
 
-.extra-info {
+.item-count {
 	font-size: var(--font-size-2xs);
 	color: var(--color-text-light);
 	margin-left: auto;
-}
-
-.notice {
-	margin-left: var(--spacing-2xl);
-	margin-top: var(--spacing-2xs);
-	padding-bottom: var(--spacing-2xs);
-	color: var(--color-text-base);
-	font-size: var(--font-size-2xs);
-	line-height: var(--font-line-height-loose);
 }
 </style>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import type { UserAction } from '@n8n/design-system';
+import type { UserAction } from 'n8n-design-system';
 import { useI18n } from '@/composables/useI18n';
 import type {
 	WorkflowHistory,

@@ -2,7 +2,7 @@
 import TimeAgo from '../TimeAgo.vue';
 import { useI18n } from '@/composables/useI18n';
 import type { ICredentialsDecryptedResponse, ICredentialsResponse } from '@/Interface';
-import { N8nText } from '@n8n/design-system';
+import { N8nText } from 'n8n-design-system';
 
 type Props = {
 	currentCredential: ICredentialsResponse | ICredentialsDecryptedResponse | null;

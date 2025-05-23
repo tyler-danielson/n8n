@@ -1,30 +1,22 @@
 <script setup lang="ts">
-import type { DraggableMode, XYPosition } from '@/Interface';
+import type { XYPosition } from '@/Interface';
+import { useNDVStore } from '@/stores/ndv.store';
 import { isPresent } from '@/utils/typesUtils';
 import { type StyleValue, computed, ref } from 'vue';
 
 type Props = {
-	type: DraggableMode;
-	data?: string | null;
-	tag?: keyof HTMLElementTagNameMap;
-	targetDataKey?: string | null;
+	type: string;
+	data?: string;
+	tag?: string;
+	targetDataKey?: string;
 	disabled?: boolean;
-	canDrop?: boolean;
-	stickyPosition?: XYPosition | null;
 };
 
-const props = withDefaults(defineProps<Props>(), {
-	data: null,
-	tag: 'div',
-	targetDataKey: null,
-	disabled: false,
-	canDrop: false,
-	stickyPosition: null,
-});
+const props = withDefaults(defineProps<Props>(), { tag: 'div', disabled: false });
 
 const emit = defineEmits<{
 	drag: [value: XYPosition];
-	dragstart: [value: HTMLElement, data: string | undefined];
+	dragstart: [value: HTMLElement];
 	dragend: [value: HTMLElement];
 }>();
 
@@ -32,10 +24,15 @@ const isDragging = ref(false);
 const draggingElement = ref<HTMLElement>();
 const draggablePosition = ref<XYPosition>([0, 0]);
 const animationFrameId = ref<number>();
+const ndvStore = useNDVStore();
 
 const draggableStyle = computed<StyleValue>(() => ({
 	transform: `translate(${draggablePosition.value[0]}px, ${draggablePosition.value[1]}px)`,
 }));
+
+const canDrop = computed(() => ndvStore.canDraggableDrop);
+
+const stickyPosition = computed(() => ndvStore.draggableStickyPos);
 
 const onDragStart = (event: MouseEvent) => {
 	if (props.disabled) {
@@ -43,7 +40,6 @@ const onDragStart = (event: MouseEvent) => {
 	}
 
 	draggingElement.value = event.target as HTMLElement;
-
 	if (props.targetDataKey && draggingElement.value.dataset?.target !== props.targetDataKey) {
 		draggingElement.value = draggingElement.value.closest(
 			`[data-target="${props.targetDataKey}"]`,
@@ -83,13 +79,19 @@ const onDrag = (event: MouseEvent) => {
 
 		const data = props.targetDataKey ? draggingElement.value.dataset.value : (props.data ?? '');
 
-		emit('dragstart', draggingElement.value, data);
+		ndvStore.draggableStartDragging({
+			type: props.type,
+			data: data ?? '',
+			dimensions: draggingElement.value?.getBoundingClientRect() ?? null,
+		});
+
+		emit('dragstart', draggingElement.value);
 		document.body.style.cursor = 'grabbing';
 	}
 
 	animationFrameId.value = window.requestAnimationFrame(() => {
-		if (props.canDrop && props.stickyPosition) {
-			draggablePosition.value = props.stickyPosition;
+		if (canDrop.value && stickyPosition.value) {
+			draggablePosition.value = stickyPosition.value;
 		} else {
 			draggablePosition.value = [event.pageX, event.pageY];
 		}
@@ -113,6 +115,7 @@ const onDragEnd = () => {
 		if (draggingElement.value) emit('dragend', draggingElement.value);
 		isDragging.value = false;
 		draggingElement.value = undefined;
+		ndvStore.draggableStopDragging();
 	}, 0);
 };
 </script>
@@ -122,7 +125,6 @@ const onDragEnd = () => {
 		:is="tag"
 		ref="wrapper"
 		:class="{ [$style.dragging]: isDragging }"
-		data-test-id="draggable"
 		@mousedown="onDragStart"
 	>
 		<slot :is-dragging="isDragging"></slot>

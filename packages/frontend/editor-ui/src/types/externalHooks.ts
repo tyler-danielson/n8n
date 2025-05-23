@@ -1,4 +1,4 @@
-import type { N8nInput } from '@n8n/design-system';
+import type { N8nInput } from 'n8n-design-system';
 import type {
 	ExecutionError,
 	GenericValue,
@@ -6,7 +6,6 @@ import type {
 	INodeProperties,
 	INodeTypeDescription,
 	ITelemetryTrackProperties,
-	NodeConnectionType,
 	NodeParameterValue,
 	NodeParameterValueType,
 } from 'n8n-workflow';
@@ -20,7 +19,7 @@ import type {
 	IWorkflowTemplateNode,
 	NodeFilterType,
 } from '@/Interface';
-import type { ComponentPublicInstance } from 'vue';
+import type { ComponentPublicInstance } from 'vue/dist/vue';
 import type { useWebhooksStore } from '@/stores/webhooks.store';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -103,7 +102,6 @@ export interface ExternalHooks {
 			ExternalHooksMethod<{
 				source?: string;
 				mode: string;
-				connectionType?: NodeConnectionType;
 				createNodeActive: boolean;
 			}>
 		>;

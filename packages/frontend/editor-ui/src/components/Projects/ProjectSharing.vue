@@ -1,17 +1,17 @@
 <script lang="ts" setup>
-import type { AllRolesMap } from '@n8n/permissions';
 import { computed, ref, watch } from 'vue';
 import { useI18n } from '@/composables/useI18n';
 import type { ProjectListItem, ProjectSharingData } from '@/types/projects.types';
 import ProjectSharingInfo from '@/components/Projects/ProjectSharingInfo.vue';
-import { sortByProperty } from '@n8n/utils/sort/sortByProperty';
+import type { RoleMap } from '@/types/roles.types';
+import { sortByProperty } from '@/utils/sortUtils';
 
 const locale = useI18n();
 
 type Props = {
 	projects: ProjectListItem[];
 	homeProject?: ProjectSharingData;
-	roles?: AllRolesMap['workflow' | 'credential' | 'project'];
+	roles?: RoleMap['workflow' | 'credential' | 'project'];
 	readonly?: boolean;
 	static?: boolean;
 	placeholder?: string;

@@ -232,9 +232,7 @@ async function onSaveWorkflowClick(): Promise<void> {
 	& > div:nth-child(1) {
 		display: flex;
 		flex-direction: row;
-		justify-content: space-between;
-		padding-block: var(--spacing-2xs);
-		padding-inline: var(--spacing-s);
+		padding: var(--spacing-xs);
 		width: 100%;
 		user-select: none;
 		color: var(--color-text-base) !important;
@@ -245,7 +243,7 @@ async function onSaveWorkflowClick(): Promise<void> {
 		display: flex;
 		flex-direction: column;
 		width: 100%;
-		padding: 0 var(--spacing-s) var(--spacing-2xs) !important;
+		padding: 0 var(--spacing-l) var(--spacing-s) !important;
 
 		span {
 			width: 100%;

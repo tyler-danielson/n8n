@@ -1,17 +1,17 @@
 import { createTagsApi } from '@/api/tags';
-import { STORES } from '@n8n/stores';
+import { STORES } from '@/constants';
 import type { ITag } from '@/Interface';
 import { defineStore } from 'pinia';
-import { useRootStore } from '@n8n/stores/useRootStore';
+import { useRootStore } from './root.store';
 import { computed, ref } from 'vue';
 import { useWorkflowsStore } from './workflows.store';
 
 const apiMapping = {
 	[STORES.TAGS]: createTagsApi('/tags'),
 	[STORES.ANNOTATION_TAGS]: createTagsApi('/annotation-tags'),
-} as const;
+};
 
-const createTagsStore = (id: typeof STORES.TAGS | typeof STORES.ANNOTATION_TAGS) => {
+const createTagsStore = (id: STORES.TAGS | STORES.ANNOTATION_TAGS) => {
 	const tagsApi = apiMapping[id];
 
 	return defineStore(
@@ -80,30 +80,18 @@ const createTagsStore = (id: typeof STORES.TAGS | typeof STORES.ANNOTATION_TAGS)
 				}
 
 				loading.value = true;
-				const retrievedTags = await tagsApi.getTags(rootStore.restApiContext, {
-					withUsageCount,
-				});
+				const retrievedTags = await tagsApi.getTags(
+					rootStore.restApiContext,
+					Boolean(withUsageCount),
+				);
 				setAllTags(retrievedTags);
 				loading.value = false;
 				return retrievedTags;
 			};
 
-			const create = async (
-				name: string,
-				{ incrementExisting }: { incrementExisting?: boolean } = {},
-			) => {
-				let tagName = name;
-
-				if (incrementExisting) {
-					const tagNameRegex = new RegExp(tagName);
-					const existingTags = allTags.value.filter((tag) => tagNameRegex.test(tag.name));
-					if (existingTags.length > 0) {
-						tagName = `${tagName} (${existingTags.length + 1})`;
-					}
-				}
-				const createdTag = await tagsApi.createTag(rootStore.restApiContext, { name: tagName });
+			const create = async (name: string) => {
+				const createdTag = await tagsApi.createTag(rootStore.restApiContext, { name });
 				upsertTags([createdTag]);
-
 				return createdTag;
 			};
 

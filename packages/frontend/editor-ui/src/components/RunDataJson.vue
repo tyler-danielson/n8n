@@ -23,17 +23,15 @@ const LazyRunDataJsonActions = defineAsyncComponent(
 const props = withDefaults(
 	defineProps<{
 		editMode: { enabled?: boolean; value?: string };
-		pushRef?: string;
+		pushRef: string;
 		paneType: string;
 		node: INodeUi;
 		inputData: INodeExecutionData[];
 		mappingEnabled?: boolean;
 		distanceFromActive: number;
-		outputIndex: number | undefined;
 		runIndex: number | undefined;
 		totalRuns: number | undefined;
 		search: string | undefined;
-		compact?: boolean;
 	}>(),
 	{
 		editMode: () => ({}),
@@ -47,6 +45,7 @@ const telemetry = useTelemetry();
 
 const selectedJsonPath = ref(nonExistingJsonPath);
 const draggingPath = ref<null | string>(null);
+const displayMode = ref('json');
 const jsonDataContainer = ref(null);
 
 const { height } = useElementSize(jsonDataContainer);
@@ -73,24 +72,15 @@ const getJsonParameterPath = (path: string) => {
 	});
 };
 
-const canDraggableDrop = computed(() => ndvStore.canDraggableDrop);
-const draggableStickyPosition = computed(() => ndvStore.draggableStickyPos);
-
-const onDragStart = (el: HTMLElement, data?: string) => {
+const onDragStart = (el: HTMLElement) => {
 	if (el?.dataset.path) {
 		draggingPath.value = el.dataset.path;
 	}
 
-	ndvStore.draggableStartDragging({
-		type: 'mapping',
-		data: data ?? '',
-		dimensions: el?.getBoundingClientRect() ?? null,
-	});
 	ndvStore.resetMappingTelemetry();
 };
 
 const onDragEnd = (el: HTMLElement) => {
-	ndvStore.draggableStopDragging();
 	draggingPath.value = null;
 	const mappingTelemetry = ndvStore.mappingTelemetry;
 	const telemetryPayload = {
@@ -124,32 +114,23 @@ const getListItemName = (path: string) => {
 </script>
 
 <template>
-	<div
-		ref="jsonDataContainer"
-		:class="[
-			$style.jsonDisplay,
-			{ [$style.highlight]: highlight, [$style.compact]: props.compact },
-		]"
-	>
+	<div ref="jsonDataContainer" :class="[$style.jsonDisplay, { [$style.highlight]: highlight }]">
 		<Suspense>
 			<LazyRunDataJsonActions
 				v-if="!editMode.enabled"
 				:node="node"
-				:pane-type="paneType"
 				:push-ref="pushRef"
+				:display-mode="displayMode"
 				:distance-from-active="distanceFromActive"
 				:selected-json-path="selectedJsonPath"
 				:json-data="jsonData"
-				:output-index="outputIndex"
-				:run-index="runIndex"
+				:pane-type="paneType"
 			/>
 		</Suspense>
 		<Draggable
 			type="mapping"
 			target-data-key="mappable"
 			:disabled="!mappingEnabled"
-			:can-drop="canDraggableDrop"
-			:sticky-position="draggableStickyPosition"
 			@dragstart="onDragStart"
 			@dragend="onDragEnd"
 		>
@@ -245,10 +226,6 @@ const getListItemName = (path: string) => {
 			color: var(--color-primary);
 		}
 	}
-
-	&.compact {
-		padding-left: var(--spacing-2xs);
-	}
 }
 </style>
 
@@ -256,7 +233,6 @@ const getListItemName = (path: string) => {
 .vjs-tree {
 	color: var(--color-json-default);
 	--color-line-break: var(--color-code-line-break);
-	font-size: var(--font-size-2xs);
 }
 
 .vjs-tree-node {
@@ -282,7 +258,6 @@ const getListItemName = (path: string) => {
 	> span {
 		padding: 0 var(--spacing-5xs) 0 var(--spacing-5xs);
 		margin-left: var(--spacing-5xs);
-		white-space: pre-wrap;
 	}
 }
 

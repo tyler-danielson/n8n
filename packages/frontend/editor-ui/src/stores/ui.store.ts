@@ -16,7 +16,7 @@ import {
 	LOG_STREAM_MODAL_KEY,
 	MFA_SETUP_MODAL_KEY,
 	PERSONALIZATION_MODAL_KEY,
-	NODE_PINNING_MODAL_KEY,
+	STORES,
 	TAGS_MANAGER_MODAL_KEY,
 	ANNOTATION_TAGS_MANAGER_MODAL_KEY,
 	NPS_SURVEY_MODAL_KEY,
@@ -35,15 +35,9 @@ import {
 	NEW_ASSISTANT_SESSION_MODAL,
 	PROMPT_MFA_CODE_MODAL_KEY,
 	COMMUNITY_PLUS_ENROLLMENT_MODAL,
-	API_KEY_CREATE_OR_EDIT_MODAL_KEY,
-	DELETE_FOLDER_MODAL_KEY,
-	MOVE_FOLDER_MODAL_KEY,
-	WORKFLOW_ACTIVATION_CONFLICTING_WEBHOOK_MODAL_KEY,
-	FROM_AI_PARAMETERS_MODAL_KEY,
-	IMPORT_WORKFLOW_URL_MODAL_KEY,
 } from '@/constants';
-import { STORES } from '@n8n/stores';
 import type {
+	INodeUi,
 	XYPosition,
 	Modals,
 	NewCredentialsModal,
@@ -51,10 +45,10 @@ import type {
 	NotificationOptions,
 	ModalState,
 	ModalKey,
-	AppliedThemeOption,
 } from '@/Interface';
 import { defineStore } from 'pinia';
-import { useRootStore } from '@n8n/stores/useRootStore';
+import { useRootStore } from '@/stores/root.store';
+import * as curlParserApi from '@/api/curlHelper';
 import { useWorkflowsStore } from '@/stores/workflows.store';
 import { useSettingsStore } from '@/stores/settings.store';
 import { useUsersStore } from '@/stores/users.store';
@@ -69,8 +63,6 @@ import {
 } from './ui.utils';
 import { computed, ref } from 'vue';
 import type { Connection } from '@vue-flow/core';
-import { useLocalStorage } from '@vueuse/core';
-import type { EventBus } from '@n8n/utils/event-bus';
 
 let savedTheme: ThemeOption = 'system';
 
@@ -83,6 +75,14 @@ try {
 } catch (e) {}
 
 type UiStore = ReturnType<typeof useUIStore>;
+
+type Draggable = {
+	isDragging: boolean;
+	type: string;
+	data: string;
+	canDrop: boolean;
+	stickyPosition: null | XYPosition;
+};
 
 export const useUIStore = defineStore(STORES.UI, () => {
 	const activeActions = ref<string[]>([]);
@@ -98,7 +98,6 @@ export const useUIStore = defineStore(STORES.UI, () => {
 				CREDENTIAL_SELECT_MODAL_KEY,
 				DUPLICATE_MODAL_KEY,
 				PERSONALIZATION_MODAL_KEY,
-				NODE_PINNING_MODAL_KEY,
 				INVITE_USER_MODAL_KEY,
 				TAGS_MANAGER_MODAL_KEY,
 				ANNOTATION_TAGS_MANAGER_MODAL_KEY,
@@ -118,7 +117,7 @@ export const useUIStore = defineStore(STORES.UI, () => {
 				SETUP_CREDENTIALS_MODAL_KEY,
 				PROJECT_MOVE_RESOURCE_MODAL,
 				NEW_ASSISTANT_SESSION_MODAL,
-				IMPORT_WORKFLOW_URL_MODAL_KEY,
+				COMMUNITY_PLUS_ENROLLMENT_MODAL,
 			].map((modalKey) => [modalKey, { open: false }]),
 		),
 		[DELETE_USER_MODAL_KEY]: {
@@ -140,81 +139,39 @@ export const useUIStore = defineStore(STORES.UI, () => {
 			open: false,
 			data: undefined,
 		},
-		[API_KEY_CREATE_OR_EDIT_MODAL_KEY]: {
-			open: false,
-			data: {
-				activeId: null,
-				mode: '',
-			},
-		},
 		[CREDENTIAL_EDIT_MODAL_KEY]: {
 			open: false,
 			mode: '',
 			activeId: null,
 			showAuthSelector: false,
 		} as ModalState,
-		[DELETE_FOLDER_MODAL_KEY]: {
-			open: false,
-			activeId: null,
-			data: {
-				workflowListEventBus: undefined,
-				content: {
-					workflowCount: 0,
-					subFolderCount: 0,
-				},
-			},
-		},
-		[MOVE_FOLDER_MODAL_KEY]: {
-			open: false,
-			activeId: null,
-			data: {
-				workflowListEventBus: undefined,
-			},
-		},
-		[COMMUNITY_PLUS_ENROLLMENT_MODAL]: {
-			open: false,
-			data: {
-				customHeading: undefined,
-			},
-		},
-		[WORKFLOW_ACTIVATION_CONFLICTING_WEBHOOK_MODAL_KEY]: {
-			open: false,
-			data: {
-				workflowName: '',
-				workflowId: '',
-				webhookPath: '',
-				node: '',
-			},
-		},
-		[FROM_AI_PARAMETERS_MODAL_KEY]: {
-			open: false,
-			data: {
-				nodeName: undefined,
-			},
-		},
-		[IMPORT_WORKFLOW_URL_MODAL_KEY]: {
-			open: false,
-			data: {
-				url: '',
-			},
-		},
 	});
 
 	const modalStack = ref<string[]>([]);
-	const sidebarMenuCollapsedPreference = useLocalStorage<boolean>('sidebar.collapsed', false);
-	const sidebarMenuCollapsed = ref<boolean>(sidebarMenuCollapsedPreference.value);
+	const sidebarMenuCollapsed = ref<boolean>(true);
 	const currentView = ref<string>('');
+	const draggable = ref<Draggable>({
+		isDragging: false,
+		type: '',
+		data: '',
+		canDrop: false,
+		stickyPosition: null,
+	});
+
 	const stateIsDirty = ref<boolean>(false);
 	const lastSelectedNode = ref<string | null>(null);
+	const lastSelectedNodeOutputIndex = ref<number | null>(null);
+	const lastSelectedNodeEndpointUuid = ref<string | null>(null);
 	const nodeViewOffsetPosition = ref<[number, number]>([0, 0]);
+	const nodeViewMoveInProgress = ref<boolean>(false);
+	const selectedNodes = ref<INodeUi[]>([]);
 	const nodeViewInitialized = ref<boolean>(false);
 	const addFirstStepOnLoad = ref<boolean>(false);
 	const bannersHeight = ref<number>(0);
 	const bannerStack = ref<BannerName[]>([]);
 	const pendingNotificationsForViews = ref<{ [key in VIEWS]?: NotificationOptions[] }>({});
-	const processingExecutionResults = ref<boolean>(false);
 
-	const appGridDimensions = ref<{ width: number; height: number }>({ width: 0, height: 0 });
+	const appGridWidth = ref<number>(0);
 
 	// Last interacted with - Canvas v2 specific
 	const lastInteractedWithNodeConnection = ref<Connection | undefined>();
@@ -227,15 +184,8 @@ export const useUIStore = defineStore(STORES.UI, () => {
 	const rootStore = useRootStore();
 	const userStore = useUsersStore();
 
-	// Keep track of the preferred theme and update it when the system preference changes
-	const preferredTheme = getPreferredTheme();
-	const preferredSystemTheme = ref<AppliedThemeOption>(preferredTheme.theme);
-	preferredTheme.mediaQuery?.addEventListener('change', () => {
-		preferredSystemTheme.value = getPreferredTheme().theme;
-	});
-
 	const appliedTheme = computed(() => {
-		return theme.value === 'system' ? preferredSystemTheme.value : theme.value;
+		return theme.value === 'system' ? getPreferredTheme() : theme.value;
 	});
 
 	const contextBasedTranslationKeys = computed(() => {
@@ -296,12 +246,23 @@ export const useUIStore = defineStore(STORES.UI, () => {
 		} as const;
 	});
 
+	const getLastSelectedNode = computed(() => {
+		if (lastSelectedNode.value) {
+			return workflowsStore.getNodeByName(lastSelectedNode.value);
+		}
+		return null;
+	});
+
 	const lastInteractedWithNode = computed(() => {
 		if (lastInteractedWithNodeId.value) {
 			return workflowsStore.getNodeById(lastInteractedWithNodeId.value);
 		}
 
 		return null;
+	});
+
+	const isVersionsOpen = computed(() => {
+		return modalsById.value[VERSIONS_MODAL_KEY].open;
 	});
 
 	const isModalActiveById = computed(() =>
@@ -328,6 +289,25 @@ export const useUIStore = defineStore(STORES.UI, () => {
 		}, {}),
 	);
 
+	const getSelectedNodes = computed(() => {
+		const seen = new Set();
+		return selectedNodes.value.filter((node) => {
+			// dedupe for instances when same node is selected in different ways
+			if (!seen.has(node)) {
+				seen.add(node);
+				return true;
+			}
+			return false;
+		});
+	});
+
+	const isNodeSelected = computed(() =>
+		selectedNodes.value.reduce((acc: { [nodeName: string]: true }, node) => {
+			acc[node.name] = true;
+			return acc;
+		}, {}),
+	);
+
 	const headerHeight = computed(() => {
 		const style = getComputedStyle(document.body);
 		return Number(style.getPropertyValue('--header-height'));
@@ -336,12 +316,6 @@ export const useUIStore = defineStore(STORES.UI, () => {
 	const isAnyModalOpen = computed(() => {
 		return modalStack.value.length > 0;
 	});
-
-	/**
-	 * Whether we are currently in the process of fetching and deserializing
-	 * the full execution data and loading it to the store.
-	 */
-	const isProcessingExecutionResults = computed(() => processingExecutionResults.value);
 
 	// Methods
 
@@ -399,6 +373,40 @@ export const useUIStore = defineStore(STORES.UI, () => {
 		modalStack.value = modalStack.value.filter((openModalName) => name !== openModalName);
 	};
 
+	const draggableStartDragging = (type: string, data: string) => {
+		draggable.value = {
+			isDragging: true,
+			type,
+			data,
+			canDrop: false,
+			stickyPosition: null,
+		};
+	};
+
+	const draggableStopDragging = () => {
+		draggable.value = {
+			isDragging: false,
+			type: '',
+			data: '',
+			canDrop: false,
+			stickyPosition: null,
+		};
+	};
+
+	const setDraggableStickyPos = (position: XYPosition) => {
+		draggable.value = {
+			...draggable.value,
+			stickyPosition: position,
+		};
+	};
+
+	const setDraggableCanDrop = (canDrop: boolean) => {
+		draggable.value = {
+			...draggable.value,
+			canDrop,
+		};
+	};
+
 	const openDeleteUserModal = (id: string) => {
 		setActiveId(DELETE_USER_MODAL_KEY, id);
 		openModal(DELETE_USER_MODAL_KEY);
@@ -443,26 +451,6 @@ export const useUIStore = defineStore(STORES.UI, () => {
 		openModal(COMMUNITY_PACKAGE_CONFIRM_MODAL_KEY);
 	};
 
-	const openDeleteFolderModal = (
-		id: string,
-		workflowListEventBus: EventBus,
-		content: { workflowCount: number; subFolderCount: number },
-	) => {
-		setActiveId(DELETE_FOLDER_MODAL_KEY, id);
-		openModalWithData({ name: DELETE_FOLDER_MODAL_KEY, data: { workflowListEventBus, content } });
-	};
-
-	const openMoveToFolderModal = (
-		resourceType: 'folder' | 'workflow',
-		resource: { id: string; name: string; parentFolderId?: string },
-		workflowListEventBus: EventBus,
-	) => {
-		openModalWithData({
-			name: MOVE_FOLDER_MODAL_KEY,
-			data: { resourceType, resource, workflowListEventBus },
-		});
-	};
-
 	const addActiveAction = (action: string) => {
 		if (!activeActions.value.includes(action)) {
 			activeActions.value.push(action);
@@ -476,10 +464,48 @@ export const useUIStore = defineStore(STORES.UI, () => {
 		}
 	};
 
+	const addSelectedNode = (node: INodeUi) => {
+		const isAlreadySelected = selectedNodes.value.some((n) => n.name === node.name);
+		if (!isAlreadySelected) {
+			selectedNodes.value.push(node);
+		}
+	};
+
+	const removeNodeFromSelection = (node: INodeUi) => {
+		for (const [index] of selectedNodes.value.entries()) {
+			if (selectedNodes.value[index].name === node.name) {
+				selectedNodes.value.splice(Number(index), 1);
+				break;
+			}
+		}
+	};
+
+	const resetSelectedNodes = () => {
+		selectedNodes.value = [];
+	};
+
+	const setCurlCommand = (payload: { name: string; command: string }) => {
+		modalsById.value[payload.name] = {
+			...modalsById.value[payload.name],
+			curlCommand: payload.command,
+		};
+	};
+
 	const toggleSidebarMenuCollapse = () => {
-		const newCollapsedState = !sidebarMenuCollapsed.value;
-		sidebarMenuCollapsedPreference.value = newCollapsedState;
-		sidebarMenuCollapsed.value = newCollapsedState;
+		sidebarMenuCollapsed.value = !sidebarMenuCollapsed.value;
+	};
+
+	const getCurlToJson = async (curlCommand: string) => {
+		const parameters = await curlParserApi.getCurlToJson(rootStore.restApiContext, curlCommand);
+
+		// Normalize placeholder values
+		if (parameters['parameters.url']) {
+			parameters['parameters.url'] = parameters['parameters.url']
+				.replaceAll('%7B', '{')
+				.replaceAll('%7D', '}');
+		}
+
+		return parameters;
 	};
 
 	const removeBannerFromStack = (name: BannerName) => {
@@ -515,6 +541,10 @@ export const useUIStore = defineStore(STORES.UI, () => {
 		pendingNotificationsForViews.value[view] = notifications;
 	};
 
+	const deleteNotificationsForView = (view: VIEWS) => {
+		delete pendingNotificationsForViews.value[view];
+	};
+
 	function resetLastInteractedWith() {
 		lastInteractedWithNodeConnection.value = undefined;
 		lastInteractedWithNodeHandle.value = null;
@@ -522,37 +552,36 @@ export const useUIStore = defineStore(STORES.UI, () => {
 		lastCancelledConnectionPosition.value = undefined;
 	}
 
-	/**
-	 * Set whether we are currently in the process of fetching and deserializing
-	 * the full execution data and loading it to the store.
-	 */
-	const setProcessingExecutionResults = (value: boolean) => {
-		processingExecutionResults.value = value;
-	};
-
 	return {
-		appGridDimensions,
+		appGridWidth,
 		appliedTheme,
 		contextBasedTranslationKeys,
+		getLastSelectedNode,
+		isVersionsOpen,
 		isModalActiveById,
 		isReadOnlyView,
 		isActionActive,
 		activeActions,
+		getSelectedNodes,
+		isNodeSelected,
 		headerHeight,
 		stateIsDirty,
+		lastSelectedNodeOutputIndex,
 		activeCredentialType,
 		lastSelectedNode,
+		selectedNodes,
 		bannersHeight,
+		lastSelectedNodeEndpointUuid,
 		lastInteractedWithNodeConnection,
 		lastInteractedWithNodeHandle,
 		lastInteractedWithNodeId,
 		lastInteractedWithNode,
 		lastCancelledConnectionPosition,
 		nodeViewOffsetPosition,
+		nodeViewMoveInProgress,
 		nodeViewInitialized,
 		addFirstStepOnLoad,
 		sidebarMenuCollapsed,
-		sidebarMenuCollapsedPreference,
 		bannerStack,
 		theme,
 		modalsById,
@@ -560,12 +589,18 @@ export const useUIStore = defineStore(STORES.UI, () => {
 		isAnyModalOpen,
 		pendingNotificationsForViews,
 		activeModals,
-		isProcessingExecutionResults,
 		setTheme,
+		setMode,
+		setActiveId,
+		setShowAuthSelector,
 		setModalData,
 		openModalWithData,
 		openModal,
 		closeModal,
+		draggableStartDragging,
+		draggableStopDragging,
+		setDraggableStickyPos,
+		setDraggableCanDrop,
 		openDeleteUserModal,
 		openExistingCredential,
 		openNewCredential,
@@ -574,16 +609,20 @@ export const useUIStore = defineStore(STORES.UI, () => {
 		openCommunityPackageUpdateConfirmModal,
 		addActiveAction,
 		removeActiveAction,
+		addSelectedNode,
+		removeNodeFromSelection,
+		resetSelectedNodes,
+		setCurlCommand,
 		toggleSidebarMenuCollapse,
+		getCurlToJson,
+		removeBannerFromStack,
 		dismissBanner,
 		updateBannersHeight,
 		pushBannerToStack,
 		clearBannerStack,
 		setNotificationsForView,
+		deleteNotificationsForView,
 		resetLastInteractedWith,
-		setProcessingExecutionResults,
-		openDeleteFolderModal,
-		openMoveToFolderModal,
 	};
 });
 

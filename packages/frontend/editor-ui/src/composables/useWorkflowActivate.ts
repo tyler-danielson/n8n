@@ -34,8 +34,7 @@ export function useWorkflowActivate() {
 		workflowId: string | undefined,
 		newActiveState: boolean,
 		telemetrySource?: string,
-	): Promise<boolean> => {
-		// Add return type
+	) => {
 		updatingWorkflowActivation.value = true;
 		const nodesIssuesExist = workflowsStore.nodesIssuesExist;
 
@@ -44,7 +43,7 @@ export function useWorkflowActivate() {
 			const saved = await workflowHelpers.saveCurrentWorkflow();
 			if (!saved) {
 				updatingWorkflowActivation.value = false;
-				return false; // Return false if save failed
+				return;
 			}
 			currWorkflowId = workflowsStore.workflowId;
 		}
@@ -70,7 +69,7 @@ export function useWorkflowActivate() {
 				});
 				updatingWorkflowActivation.value = false;
 
-				return true; // Already active, return true
+				return;
 			}
 
 			if (isCurrentWorkflow && nodesIssuesExist && newActiveState) {
@@ -85,7 +84,7 @@ export function useWorkflowActivate() {
 				});
 
 				updatingWorkflowActivation.value = false;
-				return false; // Return false if there are node issues
+				return;
 			}
 
 			await workflowHelpers.updateWorkflow(
@@ -101,7 +100,7 @@ export function useWorkflowActivate() {
 				}) + ':',
 			);
 			updatingWorkflowActivation.value = false;
-			return false; // Return false if update failed
+			return;
 		}
 
 		const activationEventName = isCurrentWorkflow
@@ -121,8 +120,6 @@ export function useWorkflowActivate() {
 				await npsSurveyStore.fetchPromptsData();
 			}
 		}
-
-		return newActiveState; // Return the new state after successful update
 	};
 
 	const activateCurrentWorkflow = async (telemetrySource?: string) => {

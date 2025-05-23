@@ -1,5 +1,6 @@
-import type { Scope, ProjectRole } from '@n8n/permissions';
+import type { Scope } from '@n8n/permissions';
 import type { IUserResponse } from '@/Interface';
+import type { ProjectRole } from '@/types/roles.types';
 
 export const ProjectTypes = {
 	Personal: 'personal',
@@ -29,6 +30,10 @@ export type Project = ProjectSharingData & {
 export type ProjectListItem = ProjectSharingData & {
 	role: ProjectRole;
 	scopes?: Scope[];
+};
+export type ProjectCreateRequest = { name: string; icon: ProjectIcon };
+export type ProjectUpdateRequest = Pick<Project, 'id' | 'name' | 'icon'> & {
+	relations: ProjectRelationPayload[];
 };
 export type ProjectsCount = Record<ProjectType, number>;
 

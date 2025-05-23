@@ -1,10 +1,5 @@
 import '@testing-library/jest-dom';
-import 'fake-indexeddb/auto';
 import { configure } from '@testing-library/vue';
-import 'core-js/proposals/set-methods-v2';
-
-// Avoid tests failing because of difference between local and GitHub actions timezone
-process.env.TZ = 'UTC';
 
 configure({ testIdAttribute: 'data-test-id' });
 
@@ -65,50 +60,4 @@ Object.defineProperty(window, 'matchMedia', {
 		removeEventListener: vi.fn(),
 		dispatchEvent: vi.fn(),
 	})),
-});
-
-class Worker {
-	onmessage = vi.fn();
-
-	url: string;
-
-	constructor(url: string) {
-		this.url = url;
-	}
-
-	postMessage = vi.fn((message: string) => {
-		this.onmessage(message);
-	});
-
-	addEventListener = vi.fn();
-
-	terminate = vi.fn();
-}
-
-class DataTransfer {
-	private data: Record<string, unknown> = {};
-
-	setData = vi.fn((type: string, data) => {
-		this.data[type] = data;
-	});
-
-	getData = vi.fn((type) => {
-		if (type.startsWith('text')) type = 'text';
-		return this.data[type] ?? null;
-	});
-}
-
-Object.defineProperty(window, 'Worker', {
-	writable: true,
-	value: Worker,
-});
-
-Object.defineProperty(window, 'DataTransfer', {
-	writable: true,
-	value: DataTransfer,
-});
-
-Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
-	writable: true,
-	value: vi.fn(),
 });

@@ -1,22 +1,18 @@
 import type {
+	INodeParameterResourceLocator,
 	INodeTypeDescription,
 	NodeConnectionType,
 	TriggerPanelDefinition,
 } from 'n8n-workflow';
 import { nodeConnectionTypes } from 'n8n-workflow';
 import type { IExecutionResponse, ICredentialsResponse, NewCredentialsModal } from '@/Interface';
+import type { jsPlumbDOMElement } from '@jsplumb/browser-ui';
+import type { Connection } from '@jsplumb/core';
 import type { Connection as VueFlowConnection } from '@vue-flow/core';
 import type { RouteLocationRaw } from 'vue-router';
 import type { CanvasConnectionMode } from '@/types';
 import { canvasConnectionModes } from '@/types';
 import type { ComponentPublicInstance } from 'vue';
-import type {
-	CredentialsResource,
-	FolderResource,
-	Resource,
-	VariableResource,
-	WorkflowResource,
-} from '@/components/layouts/ResourcesListLayout.vue';
 
 /*
 	Type guards used in editor-ui project
@@ -25,6 +21,10 @@ import type {
 export const checkExhaustive = (value: never): never => {
 	throw new Error(`Unhandled value: ${value}`);
 };
+
+export function isResourceLocatorValue(value: unknown): value is INodeParameterResourceLocator {
+	return Boolean(typeof value === 'object' && value && 'mode' in value && 'value' in value);
+}
 
 export function isNotNull<T>(value: T | null): value is T {
 	return value !== null;
@@ -51,6 +51,14 @@ export const isCredentialModalState = (value: unknown): value is NewCredentialsM
 
 export const isResourceMapperValue = (value: unknown): value is string | number | boolean => {
 	return ['string', 'number', 'boolean'].includes(typeof value);
+};
+
+export const isJSPlumbEndpointElement = (element: Node): element is jsPlumbDOMElement => {
+	return 'jtk' in element && 'endpoint' in (element.jtk as object);
+};
+
+export const isJSPlumbConnection = (connection: unknown): connection is Connection => {
+	return connection !== null && typeof connection === 'object' && 'connector' in connection;
 };
 
 export function isDateObject(date: unknown): date is Date {
@@ -99,32 +107,4 @@ export function isRouteLocationRaw(value: unknown): value is RouteLocationRaw {
 
 export function isComponentPublicInstance(value: unknown): value is ComponentPublicInstance {
 	return value !== null && typeof value === 'object' && '$props' in value;
-}
-
-export function isWorkflowResource(value: Resource): value is WorkflowResource {
-	return value.resourceType === 'workflow';
-}
-
-export function isFolderResource(value: Resource): value is FolderResource {
-	return value.resourceType === 'folder';
-}
-
-export function isVariableResource(value: Resource): value is VariableResource {
-	return value.resourceType === 'variable';
-}
-
-export function isCredentialsResource(value: Resource): value is CredentialsResource {
-	return value.resourceType === 'credential';
-}
-
-export function isSharedResource(
-	value: Resource,
-): value is WorkflowResource | FolderResource | CredentialsResource {
-	return isWorkflowResource(value) || isFolderResource(value) || isCredentialsResource(value);
-}
-
-export function isResourceSortableByDate(
-	value: Resource,
-): value is WorkflowResource | FolderResource | CredentialsResource {
-	return isWorkflowResource(value) || isFolderResource(value) || isCredentialsResource(value);
 }

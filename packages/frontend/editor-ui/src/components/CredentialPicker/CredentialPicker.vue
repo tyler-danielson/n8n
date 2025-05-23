@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue';
 import { listenForModalChanges, useUIStore } from '@/stores/ui.store';
 import { listenForCredentialChanges, useCredentialsStore } from '@/stores/credentials.store';
-import { assert } from '@n8n/utils/assert';
+import { assert } from '@/utils/assert';
 import CredentialsDropdown from './CredentialsDropdown.vue';
 import { useI18n } from '@/composables/useI18n';
 import { CREDENTIAL_EDIT_MODAL_KEY } from '@/constants';
@@ -26,10 +26,7 @@ const i18n = useI18n();
 const wasModalOpenedFromHere = ref(false);
 
 const availableCredentials = computed(() => {
-	const credByType = credentialsStore.getCredentialsByType(props.credentialType);
-	// Only show personal credentials since templates are created in personal by default
-	// Here, we don't care about sharing because credentials cannot be shared with personal project
-	return credByType.filter((credential) => credential.homeProject?.type === 'personal');
+	return credentialsStore.getCredentialsByType(props.credentialType);
 });
 
 const credentialOptions = computed(() => {
@@ -101,7 +98,6 @@ listenForModalChanges({
 				:credential-type="props.credentialType"
 				:credential-options="credentialOptions"
 				:selected-credential-id="props.selectedCredentialId"
-				data-test-id="credential-dropdown"
 				@credential-selected="onCredentialSelected"
 				@new-credential="createNewCredential"
 			/>

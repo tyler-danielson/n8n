@@ -15,7 +15,6 @@ const props = withDefaults(
 		loaderType?: 'image' | 'spinner';
 		canOpenNDV?: boolean;
 		hideNodeIssues?: boolean;
-		focusOnLoad?: boolean;
 	}>(),
 	{
 		loading: false,
@@ -26,7 +25,6 @@ const props = withDefaults(
 		loaderType: 'image',
 		canOpenNDV: true,
 		hideNodeIssues: false,
-		focusOnLoad: true,
 	},
 );
 
@@ -122,7 +120,6 @@ const onMouseEnter = () => {
 	scrollX.value = window.scrollX;
 	scrollY.value = window.scrollY;
 };
-
 const onMouseLeave = () => {
 	insideIframe.value = false;
 };
@@ -134,41 +131,18 @@ const receiveMessage = ({ data }: MessageEvent) => {
 	try {
 		const json = JSON.parse(data);
 		if (json.command === 'n8nReady') {
-			onReady();
+			ready.value = true;
 		} else if (json.command === 'openNDV') {
-			onOpenNDV();
+			nodeViewDetailsOpened.value = true;
 		} else if (json.command === 'closeNDV') {
-			onCloseNDV();
+			nodeViewDetailsOpened.value = false;
 		} else if (json.command === 'error') {
-			onError();
+			emit('close');
 		}
 	} catch (e) {
 		console.error(e);
 	}
 };
-
-const onReady = () => {
-	ready.value = true;
-
-	if (props.focusOnLoad) {
-		setTimeout(() => {
-			iframeRef.value?.contentWindow?.focus();
-		});
-	}
-};
-
-const onOpenNDV = () => {
-	nodeViewDetailsOpened.value = true;
-};
-
-const onCloseNDV = () => {
-	nodeViewDetailsOpened.value = false;
-};
-
-const onError = () => {
-	emit('close');
-};
-
 const onDocumentScroll = () => {
 	if (insideIframe.value) {
 		window.scrollTo(scrollX.value, scrollY.value);

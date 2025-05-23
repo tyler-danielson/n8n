@@ -2,12 +2,11 @@
 import type { ICredentialsResponse, INodeUi, INodeUpdatePropertiesInformation } from '@/Interface';
 import {
 	HTTP_REQUEST_NODE_TYPE,
-	type ICredentialType,
 	type INodeCredentialDescription,
 	type INodeCredentialsDetails,
 	type NodeParameterValueType,
 } from 'n8n-workflow';
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 import { useNodeHelpers } from '@/composables/useNodeHelpers';
 import { useToast } from '@/composables/useToast';
@@ -22,7 +21,7 @@ import { useNDVStore } from '@/stores/ndv.store';
 import { useNodeTypesStore } from '@/stores/nodeTypes.store';
 import { useUIStore } from '@/stores/ui.store';
 import { useWorkflowsStore } from '@/stores/workflows.store';
-import { assert } from '@n8n/utils/assert';
+import { assert } from '@/utils/assert';
 import {
 	getAllNodeCredentialForAuthType,
 	getAuthTypeForNodeCredential,
@@ -32,14 +31,13 @@ import {
 	updateNodeAuthType,
 } from '@/utils/nodeTypesUtils';
 import {
-	N8nIcon,
 	N8nInput,
 	N8nInputLabel,
 	N8nOption,
 	N8nSelect,
 	N8nText,
 	N8nTooltip,
-} from '@n8n/design-system';
+} from 'n8n-design-system';
 import { isEmpty } from '@/utils/typesUtils';
 
 interface CredentialDropdownOption extends ICredentialsResponse {
@@ -69,7 +67,7 @@ const emit = defineEmits<{
 
 const telemetry = useTelemetry();
 const i18n = useI18n();
-const NEW_CREDENTIALS_TEXT = i18n.baseText('nodeCredentials.createNew');
+const NEW_CREDENTIALS_TEXT = `- ${i18n.baseText('nodeCredentials.createNew')} -`;
 
 const credentialsStore = useCredentialsStore();
 const nodeTypesStore = useNodeTypesStore();
@@ -81,25 +79,33 @@ const nodeHelpers = useNodeHelpers();
 const toast = useToast();
 
 const subscribedToCredentialType = ref('');
-const filter = ref('');
 const listeningForAuthChange = ref(false);
-const selectRefs = ref<Array<InstanceType<typeof N8nSelect>>>([]);
-
-const credentialTypesNodeDescriptions = computed(() =>
-	credentialsStore.getCredentialTypesNodeDescriptions(props.overrideCredType, nodeType.value),
-);
 
 const credentialTypesNode = computed(() =>
-	credentialTypesNodeDescriptions.value.map(
+	credentialTypesNodeDescription.value.map(
 		(credentialTypeDescription) => credentialTypeDescription.name,
 	),
 );
 
 const credentialTypesNodeDescriptionDisplayed = computed(() =>
-	credentialTypesNodeDescriptions.value
+	credentialTypesNodeDescription.value
 		.filter((credentialTypeDescription) => displayCredentials(credentialTypeDescription))
 		.map((type) => ({ type, options: getCredentialOptions(getAllRelatedCredentialTypes(type)) })),
 );
+const credentialTypesNodeDescription = computed(() => {
+	if (typeof props.overrideCredType !== 'string') return [];
+
+	const credType = credentialsStore.getCredentialTypeByName(props.overrideCredType);
+
+	if (credType) return [credType];
+
+	const activeNodeType = nodeType.value;
+	if (activeNodeType?.credentials) {
+		return activeNodeType.credentials;
+	}
+
+	return [];
+});
 
 const credentialTypeNames = computed(() => {
 	const returnData: Record<string, string> = {};
@@ -338,8 +344,9 @@ function onCredentialSelected(
 	credentialId: string | null | undefined,
 	showAuthOptions = false,
 ) {
-	if (!credentialId) {
-		createNewCredential(credentialType, false, showAuthOptions);
+	const newCredentialOptionSelected = credentialId === NEW_CREDENTIALS_TEXT;
+	if (!credentialId || newCredentialOptionSelected) {
+		createNewCredential(credentialType, newCredentialOptionSelected, showAuthOptions);
 		return;
 	}
 
@@ -494,20 +501,6 @@ function getCredentialsFieldLabel(credentialType: INodeCredentialDescription): s
 	}
 	return i18n.baseText('nodeCredentials.credentialsLabel');
 }
-
-function setFilter(newFilter = '') {
-	filter.value = newFilter;
-}
-
-function matches(needle: string, haystack: string) {
-	return haystack.toLocaleLowerCase().includes(needle);
-}
-
-async function onClickCreateCredential(type: ICredentialType | INodeCredentialDescription) {
-	selectRefs.value.forEach((select) => select.blur());
-	await nextTick();
-	createNewCredential(type.name, true, showMixedCredentials(type));
-}
 </script>
 
 <template>
@@ -537,20 +530,16 @@ async function onClickCreateCredential(type: ICredentialType | INodeCredentialDe
 					data-test-id="node-credentials-select"
 				>
 					<N8nSelect
-						ref="selectRefs"
 						:model-value="getSelectedId(type.name)"
 						:placeholder="getSelectPlaceholder(type.name, getIssues(type.name))"
 						size="small"
-						filterable
-						:filter-method="setFilter"
-						:popper-class="$style.selectPopper"
 						@update:model-value="
 							(value: string) => onCredentialSelected(type.name, value, showMixedCredentials(type))
 						"
 						@blur="emit('blur', 'credentials')"
 					>
 						<N8nOption
-							v-for="item in options.filter((o) => matches(filter, o.name))"
+							v-for="item in options"
 							:key="item.id"
 							:data-test-id="`node-credentials-select-item-${item.id}`"
 							:label="item.name"
@@ -561,17 +550,13 @@ async function onClickCreateCredential(type: ICredentialType | INodeCredentialDe
 								<N8nText size="small">{{ item.typeDisplayName }}</N8nText>
 							</div>
 						</N8nOption>
-						<template #empty> </template>
-						<template #footer>
-							<div
-								data-test-id="node-credentials-select-item-new"
-								:class="['clickable', $style.newCredential]"
-								@click="onClickCreateCredential(type)"
-							>
-								<N8nIcon size="xsmall" icon="plus" />
-								<N8nText bold>{{ NEW_CREDENTIALS_TEXT }}</N8nText>
-							</div>
-						</template>
+						<N8nOption
+							:key="NEW_CREDENTIALS_TEXT"
+							data-test-id="node-credentials-select-item-new"
+							:value="NEW_CREDENTIALS_TEXT"
+							:label="NEW_CREDENTIALS_TEXT"
+						>
+						</N8nOption>
 					</N8nSelect>
 
 					<div v-if="getIssues(type.name).length && !hideIssues" :class="$style.warning">
@@ -582,7 +567,7 @@ async function onClickCreateCredential(type: ICredentialType | INodeCredentialDe
 									:items="getIssues(type.name)"
 								/>
 							</template>
-							<N8nIcon icon="exclamation-triangle" />
+							<font-awesome-icon icon="exclamation-triangle" />
 						</N8nTooltip>
 					</div>
 
@@ -591,7 +576,7 @@ async function onClickCreateCredential(type: ICredentialType | INodeCredentialDe
 						:class="$style.edit"
 						data-test-id="credential-edit-button"
 					>
-						<N8nIcon
+						<font-awesome-icon
 							icon="pen"
 							class="clickable"
 							:title="i18n.baseText('nodeCredentials.updateCredential')"
@@ -613,25 +598,10 @@ async function onClickCreateCredential(type: ICredentialType | INodeCredentialDe
 	}
 }
 
-.selectPopper {
-	:global(.el-select-dropdown__list) {
-		padding: 0;
-	}
-
-	:has(.newCredential:hover) :global(.hover) {
-		background-color: transparent;
-	}
-
-	&:not(:has(li)) .newCredential {
-		border-top: none;
-		box-shadow: none;
-		border-radius: var(--border-radius-base);
-	}
-}
-
 .warning {
-	margin-left: var(--spacing-4xs);
-	color: var(--color-danger-light);
+	min-width: 20px;
+	margin-left: 5px;
+	color: #ff8080;
 	font-size: var(--font-size-s);
 }
 
@@ -640,7 +610,8 @@ async function onClickCreateCredential(type: ICredentialType | INodeCredentialDe
 	justify-content: center;
 	align-items: center;
 	color: var(--color-text-base);
-	margin-left: var(--spacing-3xs);
+	min-width: 20px;
+	margin-left: 5px;
 	font-size: var(--font-size-s);
 }
 
@@ -657,22 +628,5 @@ async function onClickCreateCredential(type: ICredentialType | INodeCredentialDe
 .credentialOption {
 	display: flex;
 	flex-direction: column;
-}
-
-.newCredential {
-	display: flex;
-	gap: var(--spacing-3xs);
-	align-items: center;
-	font-weight: var(--font-weight-bold);
-	padding: var(--spacing-xs) var(--spacing-m);
-	background-color: var(--color-background-light);
-
-	border-top: var(--border-base);
-	box-shadow: var(--box-shadow-light);
-	clip-path: inset(-12px 0 0 0); // Only show box shadow on top
-
-	&:hover {
-		color: var(--color-primary);
-	}
 }
 </style>

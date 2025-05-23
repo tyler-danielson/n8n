@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { useI18n } from '@/composables/useI18n';
 import type { IResourceLocatorResultExpanded } from '@/Interface';
-import { N8nLoading } from '@n8n/design-system';
-import type { EventBus } from '@n8n/utils/event-bus';
-import { createEventBus } from '@n8n/utils/event-bus';
+import { N8nLoading } from 'n8n-design-system';
+import type { EventBus } from 'n8n-design-system/utils';
+import { createEventBus } from 'n8n-design-system/utils';
 import type { NodeParameterValue } from 'n8n-workflow';
-import { computed, onBeforeUnmount, onMounted, ref, useCssModule, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 const SEARCH_BAR_HEIGHT_PX = 40;
 const SCROLL_MARGIN_PX = 10;
@@ -50,7 +50,6 @@ const emit = defineEmits<{
 }>();
 
 const i18n = useI18n();
-const $style = useCssModule();
 
 const hoverIndex = ref(0);
 const showHoverUrl = ref(false);
@@ -69,8 +68,7 @@ const sortedResources = computed<IResourceLocatorResultExpanded[]>(() => {
 
 			if (props.modelValue && item.value === props.modelValue) {
 				acc.selected = item;
-			} else if (!item.isArchived) {
-				// Archived items are not shown in the list unless selected
+			} else {
 				acc.notSelected.push(item);
 			}
 
@@ -128,8 +126,7 @@ function openUrl(event: MouseEvent, url: string) {
 
 function onKeyDown(e: KeyboardEvent) {
 	if (e.key === 'ArrowDown') {
-		// hoverIndex 0 is reserved for the "add new resource" item
-		if (hoverIndex.value < sortedResources.value.length) {
+		if (hoverIndex.value < sortedResources.value.length - 1) {
 			hoverIndex.value++;
 
 			if (resultsContainerRef.value && itemsRef.value.length === 1) {
@@ -156,12 +153,7 @@ function onKeyDown(e: KeyboardEvent) {
 			}
 		}
 	} else if (e.key === 'Enter') {
-		if (hoverIndex.value === 0 && props.allowNewResources.label) {
-			emit('addResourceClick');
-			return;
-		}
-
-		const selected = sortedResources.value[hoverIndex.value - 1]?.value;
+		const selected = sortedResources.value[hoverIndex.value]?.value;
 
 		// Selected resource can be empty when loading or empty results
 		if (selected) {
@@ -206,12 +198,6 @@ function onResultsEnd() {
 		}
 	}
 }
-
-function isWithinDropdown(element: HTMLElement) {
-	return Boolean(element.closest('.' + $style.popover));
-}
-
-defineExpose({ isWithinDropdown });
 </script>
 
 <template>
@@ -231,11 +217,7 @@ defineExpose({ isWithinDropdown });
 				ref="searchRef"
 				:model-value="filter"
 				:clearable="true"
-				:placeholder="
-					allowNewResources.label
-						? i18n.baseText('resourceLocator.placeholder.searchOrCreate')
-						: i18n.baseText('resourceLocator.placeholder.search')
-				"
+				:placeholder="i18n.baseText('resourceLocator.search.placeholder')"
 				data-test-id="rlc-search"
 				@update:model-value="onFilterInput"
 			>
@@ -263,7 +245,7 @@ defineExpose({ isWithinDropdown });
 				v-if="allowNewResources.label"
 				key="addResourceKey"
 				ref="itemsRef"
-				data-test-id="rlc-item-add-resource"
+				data-test-id="rlc-item"
 				:class="{
 					[$style.resourceItem]: true,
 					[$style.hovering]: hoverIndex === 0,
@@ -293,11 +275,6 @@ defineExpose({ isWithinDropdown });
 			>
 				<div :class="$style.resourceNameContainer">
 					<span>{{ result.name }}</span>
-					<span v-if="result.isArchived">
-						<N8nBadge class="ml-3xs" theme="tertiary" bold data-test-id="workflow-archived-tag">
-							{{ i18n.baseText('workflows.item.archived') }}
-						</N8nBadge>
-					</span>
 				</div>
 				<div :class="$style.urlLink">
 					<font-awesome-icon
@@ -432,7 +409,7 @@ defineExpose({ isWithinDropdown });
 }
 
 .addResourceText {
-	font-weight: var(--font-weight-bold);
+	font-weight: bold;
 }
 
 .addResourceIcon {

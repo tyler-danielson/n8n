@@ -1,10 +1,9 @@
 import type { IVersionNotificationSettings } from '@n8n/api-types';
 import * as versionsApi from '@/api/versions';
-import { VERSIONS_MODAL_KEY } from '@/constants';
-import { STORES } from '@n8n/stores';
+import { STORES, VERSIONS_MODAL_KEY } from '@/constants';
 import type { IVersion } from '@/Interface';
 import { defineStore } from 'pinia';
-import { useRootStore } from '@n8n/stores/useRootStore';
+import { useRootStore } from './root.store';
 import { useToast } from '@/composables/useToast';
 import { useUIStore } from '@/stores/ui.store';
 import { computed, ref } from 'vue';

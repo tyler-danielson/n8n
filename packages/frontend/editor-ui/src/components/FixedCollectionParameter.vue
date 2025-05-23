@@ -15,12 +15,9 @@ import {
 	N8nInputLabel,
 	N8nText,
 	N8nButton,
-} from '@n8n/design-system';
+} from 'n8n-design-system';
 import ParameterInputList from './ParameterInputList.vue';
 import Draggable from 'vuedraggable';
-import { useWorkflowsStore } from '@/stores/workflows.store';
-import { useNDVStore } from '@/stores/ndv.store';
-import { telemetry } from '@/plugins/telemetry';
 
 const locale = useI18n();
 
@@ -46,9 +43,6 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
 	valueChanged: [value: ValueChangedEvent];
 }>();
-
-const workflowsStore = useWorkflowsStore();
-const ndvStore = useNDVStore();
 
 const getPlaceholderText = computed(() => {
 	const placeholder = locale.nodeText().placeholder(props.parameter, props.path);
@@ -133,13 +127,6 @@ const getOptionProperties = (optionName: string) => {
 	return undefined;
 };
 
-const onAddButtonClick = (optionName: string) => {
-	optionSelected(optionName);
-	if (props.parameter.name === 'workflowInputs') {
-		trackWorkflowInputFieldAdded();
-	}
-};
-
 const optionSelected = (optionName: string) => {
 	const option = getOptionProperties(optionName);
 	if (option === undefined) {
@@ -196,9 +183,6 @@ const optionSelected = (optionName: string) => {
 
 const valueChanged = (parameterData: IUpdateInformation) => {
 	emit('valueChanged', parameterData);
-	if (props.parameter.name === 'workflowInputs') {
-		trackWorkflowInputFieldTypeChange(parameterData);
-	}
 };
 const onDragChange = (optionName: string) => {
 	const parameterData: ValueChangedEvent = {
@@ -208,21 +192,6 @@ const onDragChange = (optionName: string) => {
 	};
 
 	emit('valueChanged', parameterData);
-};
-
-const trackWorkflowInputFieldTypeChange = (parameterData: IUpdateInformation) => {
-	telemetry.track('User changed workflow input field type', {
-		type: parameterData.value,
-		workflow_id: workflowsStore.workflow.id,
-		node_id: ndvStore.activeNode?.id,
-	});
-};
-
-const trackWorkflowInputFieldAdded = () => {
-	telemetry.track('User added workflow input field', {
-		workflow_id: workflowsStore.workflow.id,
-		node_id: ndvStore.activeNode?.id,
-	});
 };
 </script>
 
@@ -336,7 +305,7 @@ const trackWorkflowInputFieldAdded = () => {
 				block
 				data-test-id="fixed-collection-add"
 				:label="getPlaceholderText"
-				@click="onAddButtonClick(parameter.options[0].name)"
+				@click="optionSelected(parameter.options[0].name)"
 			/>
 			<div v-else class="add-option">
 				<N8nSelect

@@ -1,6 +1,6 @@
-import { computed, inject, onBeforeUnmount, onMounted, ref, unref } from 'vue';
-import { useClipboard as useClipboardCore, useThrottleFn } from '@vueuse/core';
-import { IsInPiPWindowSymbol } from '@/constants';
+import { onBeforeUnmount, onMounted, ref } from 'vue';
+import { useClipboard as useClipboardCore } from '@vueuse/core';
+import { useDebounce } from '@/composables/useDebounce';
 
 type ClipboardEventFn = (data: string, event?: ClipboardEvent) => void;
 
@@ -11,7 +11,7 @@ export function useClipboard(
 		onPaste() {},
 	},
 ) {
-	const isInPiPWindow = inject(IsInPiPWindowSymbol, false);
+	const { debounce } = useDebounce();
 	const { copy, copied, isSupported, text } = useClipboardCore({ legacy: true });
 
 	const ignoreClasses = ['el-messsage-box', 'ignore-key-press-canvas'];
@@ -47,7 +47,9 @@ export function useClipboard(
 		}
 	}
 
-	const throttledOnPaste = useThrottleFn(onPaste, 1000);
+	const debouncedOnPaste = debounce(onPaste, {
+		debounceTime: 1000,
+	});
 
 	/**
 	 * Initialize copy/paste elements and events
@@ -57,7 +59,7 @@ export function useClipboard(
 			return;
 		}
 
-		document.addEventListener('paste', throttledOnPaste);
+		document.addEventListener('paste', debouncedOnPaste);
 
 		initialized.value = true;
 	});
@@ -67,16 +69,14 @@ export function useClipboard(
 	 */
 	onBeforeUnmount(() => {
 		if (initialized.value) {
-			document.removeEventListener('paste', throttledOnPaste);
+			document.removeEventListener('paste', debouncedOnPaste);
 		}
 	});
 
 	return {
 		copy,
 		copied,
-		// When the `copy()` method is invoked from inside of the document picture-in-picture (PiP) window, it throws the error "Document is not focused".
-		// Therefore, we disable copying features in the PiP window for now.
-		isSupported: computed(() => isSupported && !unref(isInPiPWindow)),
+		isSupported,
 		text,
 		onPaste: onPasteCallback,
 	};

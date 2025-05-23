@@ -61,9 +61,6 @@ describe('ProjectSettings', () => {
 					},
 				},
 			},
-			folders: {
-				enabled: false,
-			},
 		} as FrontendSettings);
 		projectsStore.setCurrentProject({
 			id: '123',

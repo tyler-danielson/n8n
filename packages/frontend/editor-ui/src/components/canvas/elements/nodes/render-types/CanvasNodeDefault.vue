@@ -12,12 +12,10 @@ const i18n = useI18n();
 
 const emit = defineEmits<{
 	'open:contextmenu': [event: MouseEvent];
-	activate: [id: string, event: MouseEvent];
 }>();
 
 const { initialized, viewport } = useCanvas();
 const {
-	id,
 	label,
 	subtitle,
 	inputs,
@@ -61,7 +59,6 @@ const classes = computed(() => {
 		[$style.configurable]: renderOptions.value.configurable,
 		[$style.configuration]: renderOptions.value.configuration,
 		[$style.trigger]: renderOptions.value.trigger,
-		[$style.warning]: renderOptions.value.dirtiness !== undefined,
 	};
 });
 
@@ -107,10 +104,6 @@ const isStrikethroughVisible = computed(() => {
 	return isDisabled.value && isSingleMainInputNode && isSingleMainOutputNode;
 });
 
-const iconSize = computed(() => (renderOptions.value.configuration ? 30 : 40));
-
-const iconSource = computed(() => renderOptions.value.icon);
-
 const showTooltip = ref(false);
 
 watch(initialized, () => {
@@ -129,22 +122,13 @@ watch(viewport, () => {
 function openContextMenu(event: MouseEvent) {
 	emit('open:contextmenu', event);
 }
-
-function onActivate(event: MouseEvent) {
-	emit('activate', id.value, event);
-}
 </script>
 
 <template>
-	<div
-		:class="classes"
-		:style="styles"
-		:data-test-id="dataTestId"
-		@contextmenu="openContextMenu"
-		@dblclick.stop="onActivate"
-	>
+	<div :class="classes" :style="styles" :data-test-id="dataTestId" @contextmenu="openContextMenu">
 		<CanvasNodeTooltip v-if="renderOptions.tooltip" :visible="showTooltip" />
-		<NodeIcon :icon-source="iconSource" :size="iconSize" :shrink="false" :disabled="isDisabled" />
+		<slot />
+		<CanvasNodeTriggerIcon v-if="renderOptions.trigger" />
 		<CanvasNodeStatusIcons v-if="!isDisabled" :class="$style.statusIcons" />
 		<CanvasNodeDisabledStrikeThrough v-if="isStrikethroughVisible" />
 		<div :class="$style.description">
@@ -171,11 +155,10 @@ function onActivate(event: MouseEvent) {
 	--canvas-node-border-width: 2px;
 	--configurable-node--min-input-count: 4;
 	--configurable-node--input-width: 64px;
-	--configurable-node--icon-offset: 30px;
+	--configurable-node--icon-offset: 40px;
 	--configurable-node--icon-size: 30px;
 	--trigger-node--border-radius: 36px;
 	--canvas-node--status-icons-offset: var(--spacing-3xs);
-	--node-icon-color: var(--color-foreground-dark);
 
 	position: relative;
 	height: var(--canvas-node--height);
@@ -218,18 +201,11 @@ function onActivate(event: MouseEvent) {
 				var(--configurable-node--input-width)
 		);
 
-		justify-content: flex-start;
-
-		:global(.n8n-node-icon) {
-			margin-left: var(--configurable-node--icon-offset);
-		}
-
 		.description {
 			top: unset;
 			position: relative;
 			margin-top: 0;
 			margin-left: var(--spacing-s);
-			margin-right: var(--spacing-s);
 			width: auto;
 			min-width: unset;
 			max-width: calc(
@@ -240,10 +216,6 @@ function onActivate(event: MouseEvent) {
 		}
 
 		.label {
-			text-align: left;
-		}
-
-		.subtitle {
 			text-align: left;
 		}
 
@@ -268,10 +240,6 @@ function onActivate(event: MouseEvent) {
 
 	&.success {
 		border-color: var(--color-canvas-node-success-border-color, var(--color-success));
-	}
-
-	&.warning {
-		border-color: var(--color-warning);
 	}
 
 	&.error {
@@ -318,7 +286,7 @@ function onActivate(event: MouseEvent) {
 	-webkit-line-clamp: 2;
 	overflow: hidden;
 	overflow-wrap: anywhere;
-	font-weight: var(--font-weight-medium);
+	font-weight: var(--font-weight-bold);
 	line-height: var(--font-line-height-compact);
 }
 
@@ -331,7 +299,7 @@ function onActivate(event: MouseEvent) {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	line-height: var(--font-line-height-compact);
-	font-weight: var(--font-weight-regular);
+	font-weight: 400;
 }
 
 .statusIcons {

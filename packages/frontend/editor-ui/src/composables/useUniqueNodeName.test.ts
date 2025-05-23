@@ -60,7 +60,7 @@ describe('useUniqueNodeName', () => {
 				version: 1,
 				inputs: [],
 				outputs: [],
-				group: ['input'],
+				group: [''],
 				properties: [],
 				defaults: {
 					name: 'S3',

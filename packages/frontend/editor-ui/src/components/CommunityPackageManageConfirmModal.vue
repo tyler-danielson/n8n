@@ -3,11 +3,10 @@ import Modal from '@/components/Modal.vue';
 import { COMMUNITY_PACKAGE_CONFIRM_MODAL_KEY, COMMUNITY_PACKAGE_MANAGE_ACTIONS } from '@/constants';
 import { useToast } from '@/composables/useToast';
 import { useCommunityNodesStore } from '@/stores/communityNodes.store';
-import { createEventBus } from '@n8n/utils/event-bus';
+import { createEventBus } from 'n8n-design-system/utils';
 import { useI18n } from '@/composables/useI18n';
 import { useTelemetry } from '@/composables/useTelemetry';
 import { computed, ref } from 'vue';
-import { useNodeTypesStore } from '@/stores/nodeTypes.store';
 
 export type CommunityPackageManageMode = 'uninstall' | 'update' | 'view-documentation';
 
@@ -91,7 +90,6 @@ const onUninstall = async () => {
 		});
 		loading.value = true;
 		await communityNodesStore.uninstallPackage(props.activePackageName);
-		await useNodeTypesStore().getNodeTypes();
 		toast.showMessage({
 			title: i18n.baseText('settings.communityNodes.messages.uninstall.success.title'),
 			type: 'success',
@@ -117,7 +115,6 @@ const onUpdate = async () => {
 		loading.value = true;
 		const updatedVersion = activePackage.value.updateAvailable;
 		await communityNodesStore.updatePackage(props.activePackageName);
-		await useNodeTypesStore().getNodeTypes();
 		toast.showMessage({
 			title: i18n.baseText('settings.communityNodes.messages.update.success.title'),
 			message: i18n.baseText('settings.communityNodes.messages.update.success.message', {

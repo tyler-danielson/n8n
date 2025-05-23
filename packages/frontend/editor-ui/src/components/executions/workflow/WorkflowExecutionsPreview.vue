@@ -1,20 +1,19 @@
 <script lang="ts" setup>
+import { computed, ref } from 'vue';
+import { useRoute } from 'vue-router';
+import { ElDropdown } from 'element-plus';
+import { useExecutionDebugging } from '@/composables/useExecutionDebugging';
+import { useMessage } from '@/composables/useMessage';
 import WorkflowExecutionAnnotationPanel from '@/components/executions/workflow/WorkflowExecutionAnnotationPanel.ee.vue';
 import WorkflowPreview from '@/components/WorkflowPreview.vue';
-import { useExecutionDebugging } from '@/composables/useExecutionDebugging';
+import { EnterpriseEditionFeature, MODAL_CONFIRM, VIEWS } from '@/constants';
+import type { ExecutionSummary } from 'n8n-workflow';
 import type { IExecutionUIData } from '@/composables/useExecutionHelpers';
 import { useExecutionHelpers } from '@/composables/useExecutionHelpers';
+import { useWorkflowsStore } from '@/stores/workflows.store';
 import { useI18n } from '@/composables/useI18n';
-import { useMessage } from '@/composables/useMessage';
-import { EnterpriseEditionFeature, MODAL_CONFIRM, VIEWS } from '@/constants';
 import { getResourcePermissions } from '@/permissions';
 import { useSettingsStore } from '@/stores/settings.store';
-import { useWorkflowsStore } from '@/stores/workflows.store';
-import { ElDropdown, ElDropdownItem, ElDropdownMenu } from 'element-plus';
-import { N8nButton, N8nIconButton, N8nText } from '@n8n/design-system';
-import type { ExecutionSummary } from 'n8n-workflow';
-import { computed, ref } from 'vue';
-import { RouterLink, useRoute } from 'vue-router';
 
 type RetryDropdownRef = InstanceType<typeof ElDropdown>;
 
@@ -36,6 +35,7 @@ const message = useMessage();
 const executionDebugging = useExecutionDebugging();
 const workflowsStore = useWorkflowsStore();
 const settingsStore = useSettingsStore();
+
 const retryDropdownRef = ref<RetryDropdownRef | null>(null);
 const workflowId = computed(() => route.params.name as string);
 const workflowPermissions = computed(
@@ -49,11 +49,11 @@ const debugButtonData = computed(() =>
 	props.execution?.status === 'success'
 		? {
 				text: locale.baseText('executionsList.debug.button.copyToEditor'),
-				type: 'secondary' as const,
+				type: 'secondary',
 			}
 		: {
 				text: locale.baseText('executionsList.debug.button.debugInEditor'),
-				type: 'primary' as const,
+				type: 'primary',
 			},
 );
 const isRetriable = computed(
@@ -187,7 +187,7 @@ function onRetryButtonBlur(event: FocusEvent) {
 				</N8nText>
 				<br /><N8nText v-if="execution.mode === 'retry'" color="text-base" size="medium">
 					{{ locale.baseText('executionDetails.retry') }}
-					<RouterLink
+					<router-link
 						:class="$style.executionLink"
 						:to="{
 							name: VIEWS.EXECUTION_PREVIEW,
@@ -198,11 +198,11 @@ function onRetryButtonBlur(event: FocusEvent) {
 						}"
 					>
 						#{{ execution.retryOf }}
-					</RouterLink>
+					</router-link>
 				</N8nText>
 			</div>
-			<div :class="$style.actions">
-				<RouterLink
+			<div>
+				<router-link
 					:to="{
 						name: VIEWS.EXECUTION_DEBUG,
 						params: {
@@ -223,7 +223,7 @@ function onRetryButtonBlur(event: FocusEvent) {
 							>{{ debugButtonData.text }}</span
 						>
 					</N8nButton>
-				</RouterLink>
+				</router-link>
 
 				<ElDropdown
 					v-if="isRetriable"
@@ -266,7 +266,6 @@ function onRetryButtonBlur(event: FocusEvent) {
 			</div>
 		</div>
 		<WorkflowPreview
-			:key="executionId"
 			mode="execution"
 			loader-type="spinner"
 			:execution-id="executionId"
@@ -341,15 +340,12 @@ function onRetryButtonBlur(event: FocusEvent) {
 }
 
 .debugLink {
+	margin-right: var(--spacing-xs);
+
 	a > span {
 		display: block;
 		padding: var(--button-padding-vertical, var(--spacing-xs))
 			var(--button-padding-horizontal, var(--spacing-m));
 	}
-}
-
-.actions {
-	display: flex;
-	gap: var(--spacing-xs);
 }
 </style>

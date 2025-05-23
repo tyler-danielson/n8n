@@ -2,9 +2,9 @@ import type { CanvasNodeData } from '@/types';
 import { CanvasConnectionMode } from '@/types';
 import type { MaybeRef } from 'vue';
 import { computed, unref } from 'vue';
-import { NodeConnectionTypes } from 'n8n-workflow';
+import { NodeConnectionType } from 'n8n-workflow';
 import type { Connection } from '@vue-flow/core';
-import { parseCanvasConnectionHandleString } from '@/utils/canvasUtils';
+import { parseCanvasConnectionHandleString } from '@/utils/canvasUtilsV2';
 
 export function useNodeConnections({
 	inputs,
@@ -20,11 +20,11 @@ export function useNodeConnections({
 	 */
 
 	const mainInputs = computed(() =>
-		unref(inputs).filter((input) => input.type === NodeConnectionTypes.Main),
+		unref(inputs).filter((input) => input.type === NodeConnectionType.Main),
 	);
 
 	const nonMainInputs = computed(() =>
-		unref(inputs).filter((input) => input.type !== NodeConnectionTypes.Main),
+		unref(inputs).filter((input) => input.type !== NodeConnectionType.Main),
 	);
 
 	const requiredNonMainInputs = computed(() =>
@@ -32,7 +32,7 @@ export function useNodeConnections({
 	);
 
 	const mainInputConnections = computed(
-		() => unref(connections)[CanvasConnectionMode.Input][NodeConnectionTypes.Main] ?? [],
+		() => unref(connections)[CanvasConnectionMode.Input][NodeConnectionType.Main] ?? [],
 	);
 
 	/**
@@ -40,15 +40,15 @@ export function useNodeConnections({
 	 */
 
 	const mainOutputs = computed(() =>
-		unref(outputs).filter((output) => output.type === NodeConnectionTypes.Main),
+		unref(outputs).filter((output) => output.type === NodeConnectionType.Main),
 	);
 
 	const nonMainOutputs = computed(() =>
-		unref(outputs).filter((output) => output.type !== NodeConnectionTypes.Main),
+		unref(outputs).filter((output) => output.type !== NodeConnectionType.Main),
 	);
 
 	const mainOutputConnections = computed(
-		() => unref(connections)[CanvasConnectionMode.Output][NodeConnectionTypes.Main] ?? [],
+		() => unref(connections)[CanvasConnectionMode.Output][NodeConnectionType.Main] ?? [],
 	);
 
 	/**

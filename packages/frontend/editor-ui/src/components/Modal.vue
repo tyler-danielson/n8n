@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ElDialog } from 'element-plus';
 import { computed, onMounted, onBeforeUnmount } from 'vue';
-import type { EventBus } from '@n8n/utils/event-bus';
+import type { EventBus } from 'n8n-design-system';
 import { useUIStore } from '@/stores/ui.store';
 import type { ModalKey } from '@/Interface';
 import { APP_MODALS_ELEMENT_ID } from '@/constants';
@@ -31,7 +31,6 @@ const props = withDefaults(
 		closeOnClickModal?: boolean;
 		closeOnPressEscape?: boolean;
 		appendToBody?: boolean;
-		lockScroll?: boolean;
 	}>(),
 	{
 		title: '',
@@ -47,7 +46,6 @@ const props = withDefaults(
 		closeOnClickModal: true,
 		closeOnPressEscape: true,
 		appendToBody: false,
-		lockScroll: true,
 	},
 );
 
@@ -145,7 +143,6 @@ function getCustomClass() {
 		:close-on-press-escape="closeOnPressEscape"
 		:style="styles"
 		:append-to="appendToBody ? undefined : appModalsId"
-		:lock-scroll="lockScroll"
 		:append-to-body="appendToBody"
 		:data-test-id="`${name}-modal`"
 		:modal-class="center ? $style.center : ''"

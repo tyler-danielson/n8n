@@ -20,7 +20,7 @@ import { ElTable, ElTableColumn } from 'element-plus';
 import type { Events } from 'v3-infinite-loading';
 import InfiniteLoading from 'v3-infinite-loading';
 import { useSettingsStore } from '@/stores/settings.store';
-import { createFormEventBus } from '@n8n/design-system/utils';
+import { createFormEventBus } from 'n8n-design-system/utils';
 import type { TableColumnCtx } from 'element-plus';
 import { useI18n } from '@/composables/useI18n';
 import { usePageRedirectionHelper } from '@/composables/usePageRedirectionHelper';

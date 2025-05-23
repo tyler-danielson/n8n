@@ -1,29 +1,34 @@
 import { defineStore } from 'pinia';
 import { ref, watch, computed } from 'vue';
 import { useRoute } from 'vue-router';
-import { useRootStore } from '@n8n/stores/useRootStore';
+import { useRootStore } from '@/stores/root.store';
 import * as projectsApi from '@/api/projects.api';
 import * as workflowsEEApi from '@/api/workflows.ee';
 import * as credentialsEEApi from '@/api/credentials.ee';
-import type { Project, ProjectListItem, ProjectsCount } from '@/types/projects.types';
+import type {
+	Project,
+	ProjectCreateRequest,
+	ProjectListItem,
+	ProjectUpdateRequest,
+	ProjectsCount,
+} from '@/types/projects.types';
 import { ProjectTypes } from '@/types/projects.types';
 import { useSettingsStore } from '@/stores/settings.store';
 import { hasPermission } from '@/utils/rbac/permissions';
 import type { IWorkflowDb } from '@/Interface';
+import { useWorkflowsStore } from '@/stores/workflows.store';
 import { useCredentialsStore } from '@/stores/credentials.store';
-import { STORES } from '@n8n/stores';
+import { STORES } from '@/constants';
 import { useUsersStore } from '@/stores/users.store';
 import { getResourcePermissions } from '@/permissions';
-import type { CreateProjectDto, UpdateProjectDto } from '@n8n/api-types';
-import { useSourceControlStore } from '@/stores/sourceControl.store';
 
 export const useProjectsStore = defineStore(STORES.PROJECTS, () => {
 	const route = useRoute();
 	const rootStore = useRootStore();
 	const settingsStore = useSettingsStore();
+	const workflowsStore = useWorkflowsStore();
 	const credentialsStore = useCredentialsStore();
 	const usersStore = useUsersStore();
-	const sourceControlStore = useSourceControlStore();
 
 	const projects = ref<ProjectListItem[]>([]);
 	const myProjects = ref<ProjectListItem[]>([]);
@@ -62,9 +67,8 @@ export const useProjectsStore = defineStore(STORES.PROJECTS, () => {
 	);
 	const canCreateProjects = computed<boolean>(
 		() =>
-			(hasUnlimitedProjects.value ||
-				(isTeamProjectFeatureEnabled.value && !isTeamProjectLimitExceeded.value)) &&
-			!sourceControlStore.preferences.branchReadOnly,
+			hasUnlimitedProjects.value ||
+			(isTeamProjectFeatureEnabled.value && !isTeamProjectLimitExceeded.value),
 	);
 	const hasPermissionToCreateProjects = computed(() =>
 		hasPermission(['rbac'], { rbac: { scope: 'project:create' } }),
@@ -108,30 +112,26 @@ export const useProjectsStore = defineStore(STORES.PROJECTS, () => {
 		currentProject.value = await fetchProject(id);
 	};
 
-	const createProject = async (project: CreateProjectDto): Promise<Project> => {
+	const createProject = async (project: ProjectCreateRequest): Promise<Project> => {
 		const newProject = await projectsApi.createProject(rootStore.restApiContext, project);
 		await getProjectsCount();
 		myProjects.value = [...myProjects.value, newProject as unknown as ProjectListItem];
 		return newProject;
 	};
 
-	const updateProject = async (
-		id: Project['id'],
-		projectData: Required<UpdateProjectDto>,
-	): Promise<void> => {
-		await projectsApi.updateProject(rootStore.restApiContext, id, projectData);
-		const projectIndex = myProjects.value.findIndex((p) => p.id === id);
-		const { name, icon } = projectData;
+	const updateProject = async (projectData: ProjectUpdateRequest): Promise<void> => {
+		await projectsApi.updateProject(rootStore.restApiContext, projectData);
+		const projectIndex = myProjects.value.findIndex((p) => p.id === projectData.id);
 		if (projectIndex !== -1) {
-			myProjects.value[projectIndex].name = name;
-			myProjects.value[projectIndex].icon = icon;
+			myProjects.value[projectIndex].name = projectData.name;
+			myProjects.value[projectIndex].icon = projectData.icon;
 		}
 		if (currentProject.value) {
-			currentProject.value.name = name;
-			currentProject.value.icon = icon;
+			currentProject.value.name = projectData.name;
+			currentProject.value.icon = projectData.icon;
 		}
 		if (projectData.relations) {
-			await getProject(id);
+			await getProject(projectData.id);
 		}
 	};
 
@@ -148,19 +148,9 @@ export const useProjectsStore = defineStore(STORES.PROJECTS, () => {
 	const setProjectNavActiveIdByWorkflowHomeProject = async (
 		homeProject?: IWorkflowDb['homeProject'],
 	) => {
-		// Handle personal projects
 		if (homeProject?.type === ProjectTypes.Personal) {
-			const isOwnPersonalProject = personalProject.value?.id === homeProject?.id;
-			// If it's current user's personal project, set it as current project
-			if (isOwnPersonalProject) {
-				projectNavActiveId.value = homeProject?.id ?? null;
-				currentProject.value = personalProject.value;
-			} else {
-				// Else default to overview page
-				projectNavActiveId.value = 'home';
-			}
+			projectNavActiveId.value = 'home';
 		} else {
-			// Handle team projects
 			projectNavActiveId.value = homeProject?.id ?? null;
 			if (homeProject?.id && !currentProjectId.value) {
 				await getProject(homeProject?.id);
@@ -172,13 +162,10 @@ export const useProjectsStore = defineStore(STORES.PROJECTS, () => {
 		resourceType: 'workflow' | 'credential',
 		resourceId: string,
 		projectId: string,
-		shareCredentials?: string[],
 	) => {
 		if (resourceType === 'workflow') {
-			await workflowsEEApi.moveWorkflowToProject(rootStore.restApiContext, resourceId, {
-				destinationProjectId: projectId,
-				shareCredentials,
-			});
+			await workflowsEEApi.moveWorkflowToProject(rootStore.restApiContext, resourceId, projectId);
+			await workflowsStore.fetchAllWorkflows(currentProjectId.value);
 		} else {
 			await credentialsEEApi.moveCredentialToProject(
 				rootStore.restApiContext,
@@ -196,11 +183,6 @@ export const useProjectsStore = defineStore(STORES.PROJECTS, () => {
 
 			if (newRoute?.path?.includes('home')) {
 				projectNavActiveId.value = 'home';
-				setCurrentProject(null);
-			}
-
-			if (newRoute?.path?.includes('shared')) {
-				projectNavActiveId.value = 'shared';
 				setCurrentProject(null);
 			}
 

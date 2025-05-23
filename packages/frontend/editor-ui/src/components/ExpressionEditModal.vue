@@ -11,7 +11,7 @@ import { createExpressionTelemetryPayload } from '@/utils/telemetryUtils';
 import { useTelemetry } from '@/composables/useTelemetry';
 import type { Segment } from '@/types/expressions';
 import type { INodeProperties } from 'n8n-workflow';
-import { NodeConnectionTypes } from 'n8n-workflow';
+import { NodeConnectionType } from 'n8n-workflow';
 import { outputTheme } from './ExpressionEditorModal/theme';
 import ExpressionOutput from './InlineExpressionEditor/ExpressionOutput.vue';
 import VirtualSchema from '@/components/VirtualSchema.vue';
@@ -22,8 +22,8 @@ import DraggableTarget from './DraggableTarget.vue';
 import { dropInExpressionEditor } from '@/plugins/codemirror/dragAndDrop';
 
 import { APP_MODALS_ELEMENT_ID } from '@/constants';
-import { N8nInput, N8nText } from '@n8n/design-system';
-import { N8nResizeWrapper, type ResizeData } from '@n8n/design-system';
+import { N8nInput, N8nText } from 'n8n-design-system';
+import { N8nResizeWrapper, type ResizeData } from 'n8n-design-system';
 import { useThrottleFn } from '@vueuse/core';
 
 const DEFAULT_LEFT_SIDEBAR_WIDTH = 360;
@@ -172,7 +172,7 @@ const onResizeThrottle = useThrottleFn(onResize, 10);
 						:search="appliedSearch"
 						:nodes="parentNodes"
 						:mapping-enabled="!isReadOnly"
-						:connection-type="NodeConnectionTypes.Main"
+						:connection-type="NodeConnectionType.Main"
 						pane-type="input"
 					/>
 				</div>
@@ -185,9 +185,9 @@ const onResizeThrottle = useThrottleFn(onResize, 10);
 							{{ i18n.baseText('expressionEdit.expression') }}
 						</N8nText>
 						<N8nText
-							v-n8n-html="i18n.baseText('expressionTip.javascript')"
 							:class="$style.tip"
 							size="small"
+							v-n8n-html="i18n.baseText('expressionTip.javascript')"
 						/>
 					</div>
 
@@ -245,6 +245,7 @@ const onResizeThrottle = useThrottleFn(onResize, 10);
 	margin-bottom: 0;
 
 	:global(.el-dialog__body) {
+		background-color: var(--color-expression-editor-modal-background);
 		height: 100%;
 		padding: var(--spacing-s);
 	}

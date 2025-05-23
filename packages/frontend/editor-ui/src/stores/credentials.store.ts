@@ -9,8 +9,7 @@ import type {
 } from '@/Interface';
 import * as credentialsApi from '@/api/credentials';
 import * as credentialsEeApi from '@/api/credentials.ee';
-import { EnterpriseEditionFeature } from '@/constants';
-import { STORES } from '@n8n/stores';
+import { EnterpriseEditionFeature, STORES } from '@/constants';
 import { i18n } from '@/plugins/i18n';
 import type { ProjectSharingData } from '@/types/projects.types';
 import { makeRestApiRequest } from '@/utils/apiUtils';
@@ -20,15 +19,12 @@ import { isEmpty, isPresent } from '@/utils/typesUtils';
 import type {
 	ICredentialsDecrypted,
 	ICredentialType,
-	INodeCredentialDescription,
 	INodeCredentialTestResult,
-	INodeTypeDescription,
-	NodeParameterValueType,
 } from 'n8n-workflow';
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
 import { useNodeTypesStore } from './nodeTypes.store';
-import { useRootStore } from '@n8n/stores/useRootStore';
+import { useRootStore } from './root.store';
 import { useSettingsStore } from './settings.store';
 import * as aiApi from '@/api/ai';
 
@@ -266,7 +262,6 @@ export const useCredentialsStore = defineStore(STORES.CREDENTIALS, () => {
 	const fetchAllCredentials = async (
 		projectId?: string,
 		includeScopes = true,
-		onlySharedWithMe = false,
 	): Promise<ICredentialsResponse[]> => {
 		const filter = {
 			projectId,
@@ -276,7 +271,6 @@ export const useCredentialsStore = defineStore(STORES.CREDENTIALS, () => {
 			rootStore.restApiContext,
 			isEmpty(filter) ? undefined : filter,
 			includeScopes,
-			onlySharedWithMe,
 		);
 		setCredentials(credentials);
 		return credentials;
@@ -301,30 +295,16 @@ export const useCredentialsStore = defineStore(STORES.CREDENTIALS, () => {
 		return await credentialsApi.getCredentialData(rootStore.restApiContext, id);
 	};
 
-	const getCredentialTypesNodeDescriptions: (
-		overrideCredType: NodeParameterValueType,
-		nodeType: INodeTypeDescription | null,
-	) => INodeCredentialDescription[] = (overrideCredType, nodeType) => {
-		if (typeof overrideCredType !== 'string') return [];
-
-		const credType = getCredentialTypeByName.value(overrideCredType);
-
-		if (credType) return [credType];
-
-		return nodeType?.credentials ? nodeType.credentials : [];
-	};
-
 	const createNewCredential = async (
 		data: ICredentialsDecrypted,
 		projectId?: string,
 	): Promise<ICredentialsResponse> => {
 		const settingsStore = useSettingsStore();
-		const credential = await credentialsApi.createNewCredential(rootStore.restApiContext, {
-			name: data.name,
-			type: data.type,
-			data: data.data ?? {},
+		const credential = await credentialsApi.createNewCredential(
+			rootStore.restApiContext,
+			data,
 			projectId,
-		});
+		);
 
 		if (data?.homeProject && !credential.homeProject) {
 			credential.homeProject = data.homeProject as ProjectSharingData;
@@ -460,7 +440,6 @@ export const useCredentialsStore = defineStore(STORES.CREDENTIALS, () => {
 		createNewCredential,
 		updateCredential,
 		getCredentialData,
-		getCredentialTypesNodeDescriptions,
 		oAuth1Authorize,
 		oAuth2Authorize,
 		getNewCredentialName,

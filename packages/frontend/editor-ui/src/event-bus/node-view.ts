@@ -1,4 +1,4 @@
-import { createEventBus } from '@n8n/utils/event-bus';
+import { createEventBus } from 'n8n-design-system/utils';
 import type { IDataObject } from 'n8n-workflow';
 
 /** Callback function called after workflow has been save */
@@ -23,9 +23,6 @@ export interface NodeViewEventBusEvents {
 	'runWorkflowButton:mouseenter': never;
 
 	'runWorkflowButton:mouseleave': never;
-
-	/** Command to tidy up the canvas */
-	tidyUp: never;
 }
 
 export const nodeViewEventBus = createEventBus<NodeViewEventBusEvents>();

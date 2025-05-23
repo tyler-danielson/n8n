@@ -28,7 +28,7 @@ function focus() {
 
 function onInput(event: Event) {
 	const input = event.target as HTMLInputElement;
-	emit('update:modelValue', input.value.trim());
+	emit('update:modelValue', input.value);
 }
 
 function clear() {

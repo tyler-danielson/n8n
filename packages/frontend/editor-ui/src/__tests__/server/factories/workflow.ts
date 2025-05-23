@@ -12,9 +12,6 @@ export const workflowFactory = Factory.extend<IWorkflowDb>({
 	active() {
 		return faker.datatype.boolean();
 	},
-	isArchived() {
-		return faker.datatype.boolean();
-	},
 	nodes() {
 		return [];
 	},

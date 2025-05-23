@@ -5,32 +5,23 @@ import type {
 	SimplifiedNodeType,
 	INodeCreateElement,
 	SectionCreateElement,
-	ActionTypeDescription,
-	NodeFilterType,
 } from '@/Interface';
 import {
 	AI_CATEGORY_AGENTS,
-	AI_CATEGORY_OTHER_TOOLS,
 	AI_SUBCATEGORY,
 	AI_TRANSFORM_NODE_TYPE,
 	CORE_NODES_CATEGORY,
 	DEFAULT_SUBCATEGORY,
-	HUMAN_IN_THE_LOOP_CATEGORY,
 } from '@/constants';
 import { v4 as uuidv4 } from 'uuid';
 
-import { sublimeSearch } from '@n8n/utils/search/sublimeSearch';
+import { sublimeSearch } from '@/utils/sortUtils';
 import type { NodeViewItemSection } from './viewsData';
 import { i18n } from '@/plugins/i18n';
 import { sortBy } from 'lodash-es';
 import * as changeCase from 'change-case';
 
 import { useSettingsStore } from '@/stores/settings.store';
-import { SEND_AND_WAIT_OPERATION } from 'n8n-workflow';
-import type { NodeIconSource } from '../../../utils/nodeIcon';
-import type { CommunityNodeDetails, ViewStack } from './composables/useViewStacks';
-
-const COMMUNITY_NODE_TYPE_PREVIEW_TOKEN = '-preview';
 
 export function transformNodeType(
 	node: SimplifiedNodeType,
@@ -54,26 +45,16 @@ export function transformNodeType(
 }
 
 export function subcategorizeItems(items: SimplifiedNodeType[]) {
-	const WHITE_LISTED_SUBCATEGORIES = [
-		CORE_NODES_CATEGORY,
-		AI_SUBCATEGORY,
-		HUMAN_IN_THE_LOOP_CATEGORY,
-	];
+	const WHITE_LISTED_SUBCATEGORIES = [CORE_NODES_CATEGORY, AI_SUBCATEGORY];
 	return items.reduce((acc: SubcategorizedNodeTypes, item) => {
 		// Only some subcategories are allowed
 		let subcategories: string[] = [DEFAULT_SUBCATEGORY];
 
-		const matchedSubcategories = WHITE_LISTED_SUBCATEGORIES.flatMap((category) => {
+		WHITE_LISTED_SUBCATEGORIES.forEach((category) => {
 			if (item.codex?.categories?.includes(category)) {
-				return item.codex?.subcategories?.[category] ?? [];
+				subcategories = item.codex?.subcategories?.[category] ?? [];
 			}
-
-			return [];
 		});
-
-		if (matchedSubcategories.length > 0) {
-			subcategories = matchedSubcategories;
-		}
 
 		subcategories.forEach((subcategory: string) => {
 			if (!acc[subcategory]) {
@@ -96,34 +77,21 @@ export function sortNodeCreateElements(nodes: INodeCreateElement[]) {
 	});
 }
 
-// We remove `Trigger` from e.g. `Telegram Trigger` to show it as part of the `Telegram` group,
-// but still want to show matching results when the user types `Telegram Tri` or `Telegram Trigger`
-// Ideally this would be handled via metadata, but that is a larger refactor.
-export function removeTrailingTrigger(searchFilter: string) {
-	const parts = searchFilter.split(' ');
-	if (parts.length > 1 && 'trigger'.startsWith(parts.slice(-1)[0].toLowerCase())) {
-		return parts
-			.slice(0, -1)
-			.filter((x) => x)
-			.join(' ')
-			.trimEnd();
-	}
-	return searchFilter;
-}
-
 export function searchNodes(searchFilter: string, items: INodeCreateElement[]) {
 	const askAiEnabled = useSettingsStore().isAskAiEnabled;
 	if (!askAiEnabled) {
 		items = items.filter((item) => item.key !== AI_TRANSFORM_NODE_TYPE);
 	}
 
-	const trimmedFilter = removeTrailingTrigger(searchFilter).toLowerCase();
+	// In order to support the old search we need to remove the 'trigger' part
+	const trimmedFilter = searchFilter.toLowerCase().replace('trigger', '').trimEnd();
 
-	// We have a snapshot of this call in sublimeSearch.test.ts to assert practical order for some cases
-	// Please update the snapshots per the README next to the the snapshots if you modify items significantly.
-	const result = (sublimeSearch<INodeCreateElement>(trimmedFilter, items) || []).map(
-		({ item }) => item,
-	);
+	const result = (
+		sublimeSearch<INodeCreateElement>(trimmedFilter, items, [
+			{ key: 'properties.displayName', weight: 1.3 },
+			{ key: 'properties.codex.alias', weight: 1 },
+		]) || []
+	).map(({ item }) => item);
 
 	return result;
 }
@@ -201,24 +169,15 @@ export function groupItemsInSections(
 	result.sort((a, b) => {
 		if (a.key.toLowerCase().includes('recommended')) return -1;
 		if (b.key.toLowerCase().includes('recommended')) return 1;
-		if (b.key === AI_CATEGORY_OTHER_TOOLS) return -1;
 
 		return 0;
 	});
-	if (!shouldRenderSectionSubtitle(result)) {
+	if (result.length <= 1) {
 		return items;
 	}
 
 	return result;
 }
-
-const shouldRenderSectionSubtitle = (sections: SectionCreateElement[]) => {
-	if (!sections.length) return false;
-	if (sections.length > 1) return true;
-	if (sections[0].key === SEND_AND_WAIT_OPERATION) return true;
-
-	return false;
-};
 
 export const formatTriggerActionName = (actionPropertyName: string) => {
 	let name = actionPropertyName;
@@ -227,76 +186,3 @@ export const formatTriggerActionName = (actionPropertyName: string) => {
 	}
 	return changeCase.noCase(name);
 };
-
-export const removePreviewToken = (key: string) =>
-	key.replace(COMMUNITY_NODE_TYPE_PREVIEW_TOKEN, '');
-
-export const isNodePreviewKey = (key = '') => key.includes(COMMUNITY_NODE_TYPE_PREVIEW_TOKEN);
-
-export function extendItemsWithUUID(items: INodeCreateElement[]) {
-	return items.map((item) => ({
-		...item,
-		uuid: `${item.key}-${uuidv4()}`,
-	}));
-}
-
-export const filterAndSearchNodes = (
-	mergedNodes: SimplifiedNodeType[],
-	search: string,
-	isAgentSubcategory: boolean,
-) => {
-	if (!search || isAgentSubcategory) return [];
-
-	const vettedNodes = mergedNodes.map((item) => transformNodeType(item)) as NodeCreateElement[];
-
-	const searchResult: INodeCreateElement[] = extendItemsWithUUID(
-		searchNodes(search || '', vettedNodes),
-	);
-
-	return searchResult;
-};
-
-export function prepareCommunityNodeDetailsViewStack(
-	item: NodeCreateElement,
-	nodeIcon: NodeIconSource | undefined,
-	rootView: NodeFilterType | undefined,
-	nodeActions: ActionTypeDescription[] = [],
-): ViewStack {
-	const installed = !isNodePreviewKey(item.key);
-	const packageName = removePreviewToken(item.key.split('.')[0]);
-
-	const communityNodeDetails: CommunityNodeDetails = {
-		title: item.properties.displayName,
-		description: item.properties.description,
-		key: item.key,
-		nodeIcon,
-		installed,
-		packageName,
-	};
-
-	if (nodeActions.length) {
-		const transformedActions = nodeActions?.map((a) =>
-			transformNodeType(a, item.properties.displayName, 'action'),
-		);
-
-		return {
-			subcategory: item.properties.displayName,
-			title: i18n.baseText('nodeSettings.communityNodeDetails.title'),
-			rootView,
-			hasSearch: false,
-			mode: 'actions',
-			items: transformedActions,
-			communityNodeDetails,
-		};
-	}
-
-	return {
-		subcategory: item.properties.displayName,
-		title: i18n.baseText('nodeSettings.communityNodeDetails.title'),
-		rootView,
-		hasSearch: false,
-		items: [item],
-		mode: 'community-node',
-		communityNodeDetails,
-	};
-}

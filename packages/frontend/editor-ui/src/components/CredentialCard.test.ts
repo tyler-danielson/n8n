@@ -88,8 +88,7 @@ describe('CredentialCard', () => {
 	});
 
 	it('should set readOnly variant based on prop', () => {
-		const data = createCredential({});
-		const { getByRole } = renderComponent({ props: { data, readOnly: true } });
+		const { getByRole } = renderComponent({ props: { readOnly: true } });
 		const heading = getByRole('heading');
 		expect(heading).toHaveTextContent('Read only');
 	});

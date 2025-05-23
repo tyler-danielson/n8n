@@ -4,20 +4,20 @@ import InputTriple from '@/components/InputTriple/InputTriple.vue';
 import ParameterInputFull from '@/components/ParameterInputFull.vue';
 import ParameterInputHint from '@/components/ParameterInputHint.vue';
 import ParameterIssues from '@/components/ParameterIssues.vue';
-import { useResolvedExpression } from '@/composables/useResolvedExpression';
-import useEnvironmentsStore from '@/stores/environments.ee.store';
-import { useNDVStore } from '@/stores/ndv.store';
-import type { AssignmentValue, INodeProperties } from 'n8n-workflow';
+import { useWorkflowHelpers } from '@/composables/useWorkflowHelpers';
+import { useWorkflowsStore } from '@/stores/workflows.store';
+import { isExpression, stringifyExpressionResult } from '@/utils/expressions';
+import type { AssignmentValue, INodeProperties, Result } from 'n8n-workflow';
 import { computed, ref } from 'vue';
 import TypeSelect from './TypeSelect.vue';
-import { N8nIconButton } from '@n8n/design-system';
+import { useNDVStore } from '@/stores/ndv.store';
+import { useRouter } from 'vue-router';
 
 interface Props {
 	path: string;
 	modelValue: AssignmentValue;
 	issues: string[];
 	hideType?: boolean;
-	disableType?: boolean;
 	isReadOnly?: boolean;
 	index?: number;
 }
@@ -32,7 +32,8 @@ const emit = defineEmits<{
 }>();
 
 const ndvStore = useNDVStore();
-const environmentsStore = useEnvironmentsStore();
+const router = useRouter();
+const { resolveExpression } = useWorkflowHelpers({ router });
 
 const assignmentTypeToNodeProperty = (
 	type: string,
@@ -75,20 +76,47 @@ const valueParameter = computed<INodeProperties>(() => {
 	};
 });
 
-const value = computed(() => assignment.value.value);
+const hint = computed(() => {
+	const { value } = assignment.value;
+	if (typeof value !== 'string' || !value.startsWith('=')) {
+		return '';
+	}
 
-const resolvedAdditionalExpressionData = computed(() => {
-	return { $vars: environmentsStore.variablesAsObject };
+	let result: Result<unknown, Error>;
+	try {
+		const resolvedValue = resolveExpression(
+			value,
+			undefined,
+			ndvStore.isInputParentOfActiveNode
+				? {
+						targetItem: ndvStore.expressionTargetItem ?? undefined,
+						inputNodeName: ndvStore.ndvInputNodeName,
+						inputRunIndex: ndvStore.ndvInputRunIndex,
+						inputBranchIndex: ndvStore.ndvInputBranchIndex,
+					}
+				: {},
+		) as unknown;
+
+		result = { ok: true, result: resolvedValue };
+	} catch (error) {
+		result = { ok: false, error };
+	}
+
+	const hasRunData =
+		!!useWorkflowsStore().workflowExecutionData?.data?.resultData?.runData[
+			ndvStore.activeNode?.name ?? ''
+		];
+
+	return stringifyExpressionResult(result, hasRunData);
 });
-
-const { resolvedExpressionString, isExpression } = useResolvedExpression({
-	expression: value,
-	additionalData: resolvedAdditionalExpressionData,
-});
-
-const hint = computed(() => resolvedExpressionString.value);
 
 const highlightHint = computed(() => Boolean(hint.value && ndvStore.getHoveringItem));
+
+const valueIsExpression = computed(() => {
+	const { value } = assignment.value;
+
+	return typeof value === 'string' && isExpression(value);
+});
 
 const onAssignmentNameChange = (update: IUpdateInformation): void => {
 	assignment.value.name = update.value as string;
@@ -97,7 +125,7 @@ const onAssignmentNameChange = (update: IUpdateInformation): void => {
 const onAssignmentTypeChange = (update: string): void => {
 	assignment.value.type = update;
 
-	if (update === 'boolean' && !isExpression.value) {
+	if (update === 'boolean' && !valueIsExpression.value) {
 		assignment.value.value = false;
 	}
 };
@@ -132,7 +160,7 @@ const onBlur = (): void => {
 			icon="grip-vertical"
 			:class="[$style.iconButton, $style.defaultTopPadding, 'drag-handle']"
 		></N8nIconButton>
-		<N8nIconButton
+		<n8n-icon-button
 			v-if="!isReadOnly"
 			type="tertiary"
 			text
@@ -141,7 +169,7 @@ const onBlur = (): void => {
 			data-test-id="assignment-remove"
 			:class="[$style.iconButton, $style.extraTopPadding]"
 			@click="onRemove"
-		></N8nIconButton>
+		></n8n-icon-button>
 
 		<div :class="$style.inputs">
 			<InputTriple middle-width="100px">
@@ -164,7 +192,7 @@ const onBlur = (): void => {
 					<TypeSelect
 						:class="$style.select"
 						:model-value="assignment.type ?? 'string'"
-						:is-read-only="disableType || isReadOnly"
+						:is-read-only="isReadOnly"
 						@update:model-value="onAssignmentTypeChange"
 					>
 					</TypeSelect>
@@ -188,7 +216,6 @@ const onBlur = (): void => {
 							@blur="onBlur"
 						/>
 						<ParameterInputHint
-							v-if="resolvedExpressionString"
 							data-test-id="parameter-expression-preview-value"
 							:class="$style.hint"
 							:highlight="highlightHint"

@@ -1,26 +1,12 @@
-import type { IRestApiContext } from '@/Interface';
+import type { ApiKey, IRestApiContext } from '@/Interface';
 import { makeRestApiRequest } from '@/utils/apiUtils';
-import type {
-	CreateApiKeyRequestDto,
-	UpdateApiKeyRequestDto,
-	ApiKey,
-	ApiKeyWithRawValue,
-} from '@n8n/api-types';
-import type { ApiKeyScope } from '@n8n/permissions';
 
 export async function getApiKeys(context: IRestApiContext): Promise<ApiKey[]> {
 	return await makeRestApiRequest(context, 'GET', '/api-keys');
 }
 
-export async function getApiKeyScopes(context: IRestApiContext): Promise<ApiKeyScope[]> {
-	return await makeRestApiRequest(context, 'GET', '/api-keys/scopes');
-}
-
-export async function createApiKey(
-	context: IRestApiContext,
-	payload: CreateApiKeyRequestDto,
-): Promise<ApiKeyWithRawValue> {
-	return await makeRestApiRequest(context, 'POST', '/api-keys', payload);
+export async function createApiKey(context: IRestApiContext): Promise<ApiKey> {
+	return await makeRestApiRequest(context, 'POST', '/api-keys');
 }
 
 export async function deleteApiKey(
@@ -28,12 +14,4 @@ export async function deleteApiKey(
 	id: string,
 ): Promise<{ success: boolean }> {
 	return await makeRestApiRequest(context, 'DELETE', `/api-keys/${id}`);
-}
-
-export async function updateApiKey(
-	context: IRestApiContext,
-	id: string,
-	payload: UpdateApiKeyRequestDto,
-): Promise<{ success: boolean }> {
-	return await makeRestApiRequest(context, 'PATCH', `/api-keys/${id}`, payload);
 }

@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { ResourceLocatorRequestDto, ActionResultRequestDto } from '@n8n/api-types';
-import type { IResourceLocatorResultExpanded, IUpdateInformation } from '@/Interface';
+import type { ResourceLocatorRequestDto } from '@n8n/api-types';
+import type { IResourceLocatorResultExpanded } from '@/Interface';
 import DraggableTarget from '@/components/DraggableTarget.vue';
 import ExpressionParameterInput from '@/components/ExpressionParameterInput.vue';
 import ParameterIssues from '@/components/ParameterIssues.vue';
@@ -10,7 +10,7 @@ import { useWorkflowHelpers } from '@/composables/useWorkflowHelpers';
 import { ndvEventBus } from '@/event-bus';
 import { useNDVStore } from '@/stores/ndv.store';
 import { useNodeTypesStore } from '@/stores/nodeTypes.store';
-import { useRootStore } from '@n8n/stores/useRootStore';
+import { useRootStore } from '@/stores/root.store';
 import { useUIStore } from '@/stores/ui.store';
 import { useWorkflowsStore } from '@/stores/workflows.store';
 import {
@@ -18,69 +18,30 @@ import {
 	getMainAuthField,
 	hasOnlyListMode as hasOnlyListModeUtil,
 } from '@/utils/nodeTypesUtils';
+import { isResourceLocatorValue } from '@/utils/typeGuards';
 import stringify from 'fast-json-stable-stringify';
-import type { EventBus } from '@n8n/utils/event-bus';
-import { createEventBus } from '@n8n/utils/event-bus';
-import {
-	isResourceLocatorValue,
-	type INode,
-	type INodeListSearchItems,
-	type INodeParameterResourceLocator,
-	type INodeParameters,
-	type INodeProperties,
-	type INodePropertyMode,
-	type INodePropertyModeTypeOptions,
-	type NodeParameterValue,
+import type { EventBus } from 'n8n-design-system/utils';
+import { createEventBus } from 'n8n-design-system/utils';
+import type {
+	INode,
+	INodeListSearchItems,
+	INodeParameterResourceLocator,
+	INodeParameters,
+	INodeProperties,
+	INodePropertyMode,
+	INodePropertyModeTypeOptions,
+	NodeParameterValue,
 } from 'n8n-workflow';
-import {
-	computed,
-	nextTick,
-	onBeforeUnmount,
-	onMounted,
-	type Ref,
-	ref,
-	useCssModule,
-	watch,
-} from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, type Ref, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import ResourceLocatorDropdown from './ResourceLocatorDropdown.vue';
 import { useTelemetry } from '@/composables/useTelemetry';
 import { onClickOutside, type VueInstance } from '@vueuse/core';
-import {
-	buildValueFromOverride,
-	isFromAIOverrideValue,
-	makeOverrideValue,
-	updateFromAIOverrideValues,
-	type FromAIOverride,
-} from '../../utils/fromAIOverrideUtils';
-import { N8nNotice } from '@n8n/design-system';
-import { completeExpressionSyntax } from '@/utils/expressions';
-import type { BaseTextKey } from '@/plugins/i18n';
-
-/**
- * Regular expression to check if the error message contains credential-related phrases.
- */
-const CHECK_CREDENTIALS_REGEX = /check\s+(your\s+)?credentials?/i;
-/**
- * Error codes and messages that indicate a permission error.
- */
-const PERMISSION_ERROR_CODES = ['401', '403'];
-const NODE_API_AUTH_ERROR_MESSAGES = [
-	'NodeApiError: Authorization failed',
-	'NodeApiError: Unable to sign without access token',
-	'secretOrPrivateKey must be an asymmetric key when using RS256',
-];
 
 interface IResourceLocatorQuery {
 	results: INodeListSearchItems[];
 	nextPageToken: unknown;
 	error: boolean;
-	errorDetails?: {
-		message?: string;
-		description?: string;
-		httpCode?: string;
-		stackTrace?: string;
-	};
 	loading: boolean;
 }
 
@@ -129,7 +90,6 @@ const workflowHelpers = useWorkflowHelpers({ router });
 const { callDebounced } = useDebounce();
 const i18n = useI18n();
 const telemetry = useTelemetry();
-const $style = useCssModule();
 
 const resourceDropdownVisible = ref(false);
 const resourceDropdownHiding = ref(false);
@@ -171,21 +131,12 @@ const selectedMode = computed(() => {
 
 const isListMode = computed(() => selectedMode.value === 'list');
 
-/**
- * Check if the current response contains an error that indicates a credential issue.
- * We do this by checking error http code
- * But, since out NodeApiErrors sometimes just return 500, we also check the message and stack trace
- */
-const hasCredentialError = computed(() => {
-	const stackTraceContainsCredentialError = (currentResponse.value?.errorDetails?.stackTrace ?? '')
-		.split('\n')
-		.some((line) => NODE_API_AUTH_ERROR_MESSAGES.includes(line.trim()));
-
-	return (
-		PERMISSION_ERROR_CODES.includes(currentResponse.value?.errorDetails?.httpCode ?? '') ||
-		NODE_API_AUTH_ERROR_MESSAGES.includes(currentResponse.value?.errorDetails?.message ?? '') ||
-		stackTraceContainsCredentialError
-	);
+const hasCredential = computed(() => {
+	const node = ndvStore.activeNode;
+	if (!node) {
+		return false;
+	}
+	return !!(node?.credentials && Object.keys(node.credentials).length === 1);
 });
 
 const credentialsNotSet = computed(() => {
@@ -321,96 +272,6 @@ const requiresSearchFilter = computed(
 	() => !!getPropertyArgument(currentMode.value, 'searchFilterRequired'),
 );
 
-const fromAIOverride = ref<FromAIOverride | null>(
-	makeOverrideValue(
-		{
-			value: props.modelValue?.value ?? '',
-			...props,
-		},
-		props.node,
-	),
-);
-
-const canBeContentOverride = computed(() => {
-	if (!props.node) return false;
-
-	return fromAIOverride.value !== null;
-});
-
-const isContentOverride = computed(
-	() =>
-		canBeContentOverride.value &&
-		!!isFromAIOverrideValue(props.modelValue?.value?.toString() ?? ''),
-);
-
-const showOverrideButton = computed(
-	() => canBeContentOverride.value && !isContentOverride.value && !props.isReadOnly,
-);
-
-const allowNewResources = computed(() => {
-	if (!props.node) {
-		return undefined;
-	}
-
-	const addNewResourceOptions = getPropertyArgument(currentMode.value, 'allowNewResource');
-
-	if (!addNewResourceOptions || typeof addNewResourceOptions !== 'object') {
-		return undefined;
-	}
-
-	return {
-		label: i18n.baseText(addNewResourceOptions.label as BaseTextKey, {
-			interpolate: {
-				resourceName: !!searchFilter.value ? searchFilter.value : addNewResourceOptions.defaultName,
-			},
-		}),
-		method: addNewResourceOptions.method,
-	};
-});
-
-const handleAddResourceClick = async () => {
-	if (!props.node || !allowNewResources.value) {
-		return;
-	}
-
-	const { method: addNewResourceMethodName } = allowNewResources.value;
-	const resolvedNodeParameters = workflowHelpers.resolveRequiredParameters(
-		props.parameter,
-		currentRequestParams.value.parameters,
-	);
-
-	if (!resolvedNodeParameters || !addNewResourceMethodName) {
-		return;
-	}
-
-	const requestParams: ActionResultRequestDto = {
-		nodeTypeAndVersion: {
-			name: props.node.type,
-			version: props.node.typeVersion,
-		},
-		path: props.path,
-		currentNodeParameters: resolvedNodeParameters,
-		credentials: props.node.credentials,
-		handler: addNewResourceMethodName,
-		payload: {
-			name: searchFilter.value,
-		},
-	};
-
-	const newResource = (await nodeTypesStore.getNodeParameterActionResult(
-		requestParams,
-	)) as NodeParameterValue;
-
-	refreshList();
-	await loadResources();
-	searchFilter.value = '';
-	onListItemSelected(newResource);
-};
-
-const onAddResourceClicked = computed(() =>
-	allowNewResources.value ? handleAddResourceClick : undefined,
-);
-
 watch(currentQueryError, (curr, prev) => {
 	if (resourceDropdownVisible.value && curr && !prev) {
 		if (inputRef.value) {
@@ -421,12 +282,10 @@ watch(currentQueryError, (curr, prev) => {
 
 watch(
 	() => props.isValueExpression,
-	async (newValue) => {
+	(newValue) => {
 		if (newValue) {
 			switchFromListMode();
 		}
-		await nextTick();
-		inputRef.value?.focus();
 	},
 );
 
@@ -518,7 +377,7 @@ function openResource(url: string) {
 function getPropertyArgument(
 	parameter: INodePropertyMode,
 	argumentName: keyof INodePropertyModeTypeOptions,
-): string | number | boolean | INodePropertyModeTypeOptions['allowNewResource'] | undefined {
+): string | number | boolean | undefined {
 	return parameter.typeOptions?.[argumentName];
 }
 
@@ -584,8 +443,6 @@ function onInputChange(value: NodeParameterValue): void {
 		if (resource?.url) {
 			params.cachedResultUrl = resource.url;
 		}
-	} else {
-		params.value = completeExpressionSyntax(value);
 	}
 	emit('update:modelValue', params);
 }
@@ -743,39 +600,8 @@ async function loadResources() {
 		setResponse(paramsKey, {
 			loading: false,
 			error: true,
-			errorDetails: {
-				message: removeDuplicateTextFromErrorMessage(e.message),
-				description: e.description,
-				httpCode: e.httpCode,
-				stackTrace: e.stacktrace,
-			},
 		});
 	}
-}
-
-/**
- * Removes duplicate credential-related sentences from error messages.
- * We are already showing a link to create/check the credentials, so we don't need to repeat the same message.
- */
-function removeDuplicateTextFromErrorMessage(message: string): string {
-	let segments: string[] = [];
-
-	// Split message into sentences or segments
-	if (/[-–—]/.test(message)) {
-		// By various dash types
-		segments = message.split(/\s*[-–—]\s*/);
-	} else {
-		// By sentence boundaries
-		segments = message.split(/(?<=[.!?])\s+/);
-	}
-
-	// Filter out segments containing credential check phrases
-	const filteredSegments = segments.filter((segment: string) => {
-		if (!segment.trim()) return false;
-		return !CHECK_CREDENTIALS_REGEX.test(segment);
-	});
-
-	return filteredSegments.join(' ').trim();
 }
 
 function onInputFocus(): void {
@@ -830,57 +656,11 @@ function onListItemSelected(value: NodeParameterValue) {
 	hideResourceDropdown();
 }
 
-function onInputBlur(event: FocusEvent) {
-	// Do not blur if focus is within the dropdown
-	const newTarget = event.relatedTarget;
-	if (newTarget instanceof HTMLElement && dropdownRef.value?.isWithinDropdown(newTarget)) {
-		return;
-	}
-
+function onInputBlur() {
 	if (!isSearchable.value || currentQueryError.value) {
 		hideResourceDropdown();
 	}
 	emit('blur');
-}
-
-function applyOverride() {
-	if (!props.node || !fromAIOverride.value) return;
-
-	telemetry.track(
-		'User turned on fromAI override',
-		{
-			nodeType: props.node.type,
-			parameter: props.path,
-		},
-		{ withPostHog: true },
-	);
-	updateFromAIOverrideValues(fromAIOverride.value, props.modelValue.value?.toString() ?? '');
-
-	emit('update:modelValue', {
-		...props.modelValue,
-		value: buildValueFromOverride(fromAIOverride.value, props, true),
-	});
-}
-
-function removeOverride() {
-	if (!props.node || !fromAIOverride.value) return;
-
-	telemetry.track(
-		'User turned off fromAI override',
-		{
-			nodeType: props.node.type,
-			parameter: props.path,
-		},
-		{ withPostHog: true },
-	);
-	emit('update:modelValue', {
-		...props.modelValue,
-		value: buildValueFromOverride(fromAIOverride.value, props, false),
-	});
-	void setTimeout(() => {
-		inputRef.value?.focus();
-		inputRef.value?.select();
-	}, 0);
 }
 </script>
 
@@ -903,69 +683,33 @@ function removeOverride() {
 			:error-view="currentQueryError"
 			:width="width"
 			:event-bus="eventBus"
-			:allow-new-resources="allowNewResources"
 			@update:model-value="onListItemSelected"
 			@filter="onSearchFilter"
 			@load-more="loadResourcesDebounced"
-			@add-resource-click="onAddResourceClicked"
 		>
 			<template #error>
-				<div :class="$style.errorContainer" data-test-id="rlc-error-container">
-					<n8n-text
-						v-if="credentialsNotSet || currentResponse.errorDetails"
-						color="text-dark"
-						align="center"
-						tag="div"
-					>
+				<div :class="$style.error" data-test-id="rlc-error-container">
+					<n8n-text color="text-dark" align="center" tag="div">
 						{{ i18n.baseText('resourceLocator.mode.list.error.title') }}
 					</n8n-text>
-					<div v-if="currentResponse.errorDetails" :class="$style.errorDetails">
-						<n8n-text size="small">
-							<span v-if="currentResponse.errorDetails.httpCode" data-test-id="rlc-error-code">
-								{{ currentResponse.errorDetails.httpCode }} -
-							</span>
-							<span data-test-id="rlc-error-message">{{
-								currentResponse.errorDetails.message
-							}}</span>
-						</n8n-text>
-						<N8nNotice
-							v-if="currentResponse.errorDetails.description"
-							theme="warning"
-							:class="$style.errorDescription"
-						>
-							{{ currentResponse.errorDetails.description }}
-						</N8nNotice>
-					</div>
-					<div v-if="hasCredentialError || credentialsNotSet" data-test-id="permission-error-link">
-						<a
-							v-if="credentialsNotSet"
-							:class="$style['credential-link']"
-							@click="createNewCredential"
-						>
-							{{ i18n.baseText('resourceLocator.mode.list.error.description.noCredentials') }}
-						</a>
-						<a v-else :class="$style['credential-link']" @click="openCredential">
-							{{ i18n.baseText('resourceLocator.mode.list.error.description.checkCredentials') }}
-						</a>
-					</div>
+					<n8n-text v-if="hasCredential || credentialsNotSet" size="small" color="text-base">
+						{{ i18n.baseText('resourceLocator.mode.list.error.description.part1') }}
+						<a v-if="credentialsNotSet" @click="createNewCredential">{{
+							i18n.baseText('resourceLocator.mode.list.error.description.part2.noCredentials')
+						}}</a>
+						<a v-else-if="hasCredential" @click="openCredential">{{
+							i18n.baseText('resourceLocator.mode.list.error.description.part2.hasCredentials')
+						}}</a>
+					</n8n-text>
 				</div>
 			</template>
 			<div
 				:class="{
 					[$style.resourceLocator]: true,
 					[$style.multipleModes]: hasMultipleModes,
-					[$style.inputContainerInputCorners]:
-						hasMultipleModes && canBeContentOverride && !isContentOverride,
 				}"
 			>
-				<div
-					:class="[
-						$style.background,
-						{
-							[$style.backgroundOverride]: showOverrideButton,
-						},
-					]"
-				></div>
+				<div :class="$style.background"></div>
 				<div v-if="hasMultipleModes" :class="$style.modeSelector">
 					<n8n-select
 						:model-value="selectedMode"
@@ -978,7 +722,6 @@ function removeOverride() {
 						<n8n-option
 							v-for="mode in parameter.modes"
 							:key="mode.name"
-							:data-test-id="`mode-${mode.name}`"
 							:value="mode.name"
 							:label="getModeLabel(mode)"
 							:disabled="isValueExpression && mode.name === 'list'"
@@ -1003,26 +746,16 @@ function removeOverride() {
 					>
 						<template #default="{ droppable, activeDrop }">
 							<div
-								:class="[
-									{
-										[$style.listModeInputContainer]: isListMode,
-										[$style.droppable]: droppable,
-										[$style.activeDrop]: activeDrop,
-										[$style.rightNoCorner]: canBeContentOverride && !isContentOverride,
-									},
-								]"
+								:class="{
+									[$style.listModeInputContainer]: isListMode,
+									[$style.droppable]: droppable,
+									[$style.activeDrop]: activeDrop,
+								}"
 								@keydown.stop="onKeyDown"
 							>
-								<FromAiOverrideField
-									v-if="fromAIOverride && isContentOverride"
-									:class="[$style.inputField, $style.fromAiOverrideField]"
-									:is-read-only="isReadOnly"
-									@close="removeOverride"
-								/>
 								<ExpressionParameterInput
-									v-else-if="isValueExpression || forceShowExpression"
+									v-if="isValueExpression || forceShowExpression"
 									ref="inputRef"
-									:class="$style.inputField"
 									:model-value="expressionDisplayValue"
 									:path="path"
 									:rows="3"
@@ -1032,13 +765,7 @@ function removeOverride() {
 								<n8n-input
 									v-else
 									ref="inputRef"
-									:class="[
-										$style.inputField,
-										{
-											[$style.selectInput]: isListMode,
-											[$style.rightNoCorner]: canBeContentOverride && !isContentOverride,
-										},
-									]"
+									:class="{ [$style.selectInput]: isListMode }"
 									:size="inputSize"
 									:model-value="valueToDisplay"
 									:disabled="isReadOnly"
@@ -1062,9 +789,6 @@ function removeOverride() {
 										/>
 									</template>
 								</n8n-input>
-								<div v-if="showOverrideButton" :class="$style.overrideButtonInline">
-									<FromAiOverrideButton @click="applyOverride" />
-								</div>
 							</div>
 						</template>
 					</DraggableTarget>
@@ -1081,14 +805,6 @@ function removeOverride() {
 				</div>
 			</div>
 		</ResourceLocatorDropdown>
-		<ParameterOverrideSelectableList
-			v-if="isContentOverride && fromAIOverride"
-			v-model="fromAIOverride"
-			:parameter="parameter"
-			:path="path"
-			:is-read-only="isReadOnly"
-			@update="(x: IUpdateInformation) => onInputChange(x.value?.toString())"
-		/>
 	</div>
 </template>
 

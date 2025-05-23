@@ -24,7 +24,7 @@ vi.mock('@/composables/useTelemetry', () => ({
 	})),
 }));
 
-vi.mock('@n8n/stores/useRootStore', () => ({
+vi.mock('@/stores/root.store', () => ({
 	useRootStore: vi.fn(() => ({
 		instanceId: 'test-instance-id',
 	})),

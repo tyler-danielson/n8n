@@ -2,7 +2,7 @@
 import { computed } from 'vue';
 import { useI18n } from '@/composables/useI18n';
 import type { usePinnedData } from '@/composables/usePinnedData';
-import { N8nIconButton, N8nLink, N8nText, N8nTooltip } from '@n8n/design-system';
+import { N8nIconButton, N8nLink, N8nText, N8nTooltip } from 'n8n-design-system';
 
 const locale = useI18n();
 
@@ -37,19 +37,14 @@ const visible = computed(() =>
 				{{ locale.baseText('node.discovery.pinData.ndv') }}
 			</div>
 			<div v-else>
-				<div v-if="pinnedData.hasData.value">
-					<strong>{{ locale.baseText('ndv.pinData.unpin.title') }}</strong>
-				</div>
-				<div v-else>
-					<strong>{{ locale.baseText('ndv.pinData.pin.title') }}</strong>
-					<N8nText size="small" tag="p">
-						{{ locale.baseText('ndv.pinData.pin.description') }}
+				<strong>{{ locale.baseText('ndv.pinData.pin.title') }}</strong>
+				<N8nText size="small" tag="p">
+					{{ locale.baseText('ndv.pinData.pin.description') }}
 
-						<N8nLink :to="props.dataPinningDocsUrl" size="small">
-							{{ locale.baseText('ndv.pinData.pin.link') }}
-						</N8nLink>
-					</N8nText>
-				</div>
+					<N8nLink :to="props.dataPinningDocsUrl" size="small">
+						{{ locale.baseText('ndv.pinData.pin.link') }}
+					</N8nLink>
+				</N8nText>
 			</div>
 		</template>
 		<N8nIconButton

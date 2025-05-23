@@ -17,7 +17,7 @@ import { useUIStore } from '@/stores/ui.store';
 import { useWorkflowsStore } from '@/stores/workflows.store';
 import { useNDVStore } from '@/stores/ndv.store';
 import { useNodeTypesStore } from '@/stores/nodeTypes.store';
-import { createEventBus } from '@n8n/utils/event-bus';
+import { createEventBus } from 'n8n-design-system/utils';
 import { useRouter } from 'vue-router';
 import { useWorkflowHelpers } from '@/composables/useWorkflowHelpers';
 import { isTriggerPanelObject } from '@/utils/typeGuards';
@@ -162,7 +162,9 @@ const isListeningForEvents = computed(() => {
 	);
 });
 
-const workflowRunning = computed(() => workflowsStore.isWorkflowRunning);
+const workflowRunning = computed(() => {
+	return uiStore.isActionActive['workflowRunning'];
+});
 
 const isActivelyPolling = computed(() => {
 	const triggeredNode = workflowsStore.executedNode;

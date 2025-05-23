@@ -4,7 +4,6 @@ import type { PublicInstalledPackage } from 'n8n-workflow';
 import { NPM_PACKAGE_DOCS_BASE_URL, COMMUNITY_PACKAGE_MANAGE_ACTIONS } from '@/constants';
 import { useI18n } from '@/composables/useI18n';
 import { useTelemetry } from '@/composables/useTelemetry';
-import { useSettingsStore } from '@/stores/settings.store';
 
 interface Props {
 	communityPackage?: PublicInstalledPackage | null;
@@ -20,7 +19,6 @@ const { openCommunityPackageUpdateConfirmModal, openCommunityPackageUninstallCon
 	useUIStore();
 const i18n = useI18n();
 const telemetry = useTelemetry();
-const settingsStore = useSettingsStore();
 
 const packageActions = [
 	{
@@ -97,10 +95,7 @@ function onUpdateClick() {
 					</template>
 					<n8n-icon icon="exclamation-triangle" color="danger" size="large" />
 				</n8n-tooltip>
-				<n8n-tooltip
-					v-else-if="settingsStore.isUnverifiedPackagesEnabled && communityPackage.updateAvailable"
-					placement="top"
-				>
+				<n8n-tooltip v-else-if="communityPackage.updateAvailable" placement="top">
 					<template #content>
 						<div>
 							{{ i18n.baseText('settings.communityNodes.updateAvailable.tooltip') }}

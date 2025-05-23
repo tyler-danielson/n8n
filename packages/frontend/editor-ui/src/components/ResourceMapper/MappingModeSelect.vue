@@ -3,7 +3,7 @@ import type { INodePropertyTypeOptions, ResourceMapperFields } from 'n8n-workflo
 import { computed, ref, watch } from 'vue';
 import { i18n as locale } from '@/plugins/i18n';
 import { useNodeSpecificationValues } from '@/composables/useNodeSpecificationValues';
-import { N8nInputLabel, N8nSelect, N8nText } from '@n8n/design-system';
+import { N8nInputLabel, N8nSelect, N8nText } from 'n8n-design-system';
 
 interface Props {
 	initialValue: string;
@@ -131,7 +131,7 @@ defineExpose({
 							<div class="option-headline">
 								{{ option.name }}
 							</div>
-							<div v-n8n-html="option.description" class="option-description" />
+							<div class="option-description" v-n8n-html="option.description" />
 						</div>
 					</N8nOption>
 				</N8nSelect>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { createEventBus } from '@n8n/utils/event-bus';
+import { createEventBus } from 'n8n-design-system/utils';
 import Modal from '@/components/Modal.vue';
 import {
 	COMMUNITY_PACKAGE_INSTALL_MODAL_KEY,
@@ -12,7 +12,6 @@ import { useCommunityNodesStore } from '@/stores/communityNodes.store';
 import { ref } from 'vue';
 import { useTelemetry } from '@/composables/useTelemetry';
 import { useI18n } from '@/composables/useI18n';
-import { useNodeTypesStore } from '@/stores/nodeTypes.store';
 
 const communityNodesStore = useCommunityNodesStore();
 
@@ -45,7 +44,6 @@ const onInstallClick = async () => {
 			infoTextErrorMessage.value = '';
 			loading.value = true;
 			await communityNodesStore.installPackage(packageName.value);
-			await useNodeTypesStore().getNodeTypes();
 			loading.value = false;
 			modalBus.emit('close');
 			toast.showMessage({

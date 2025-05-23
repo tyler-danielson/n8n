@@ -25,12 +25,13 @@ const props = withDefaults(
 	defineProps<{
 		node: INodeUi;
 		paneType: string;
-		pushRef?: string;
+		pushRef: string;
+		displayMode: string;
 		distanceFromActive: number;
 		selectedJsonPath: string;
 		jsonData: IDataObject[];
-		outputIndex: number | undefined;
-		runIndex: number | undefined;
+		currentOutputIndex?: number;
+		runIndex?: number;
 	}>(),
 	{
 		selectedJsonPath: nonExistingJsonPath,
@@ -70,7 +71,7 @@ function getJsonValue(): string {
 			selectedValue = clearJsonKey(pinnedData.data.value as object);
 		} else {
 			selectedValue = executionDataToJson(
-				nodeHelpers.getNodeInputData(props.node, props.runIndex, props.outputIndex),
+				nodeHelpers.getNodeInputData(props.node, props.runIndex, props.currentOutputIndex),
 			);
 		}
 	}
@@ -175,7 +176,7 @@ function handleCopyClick(commandData: { command: string }) {
 </script>
 
 <template>
-	<div :class="$style.actionsGroup" data-test-id="ndv-json-actions">
+	<div :class="$style.actionsGroup">
 		<n8n-icon-button
 			v-if="noSelection"
 			:title="i18n.baseText('runData.copyToClipboard')"

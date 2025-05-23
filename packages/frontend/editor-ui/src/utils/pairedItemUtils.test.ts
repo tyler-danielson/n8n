@@ -5,17 +5,15 @@ import {
 	getPairedItemsMapping,
 	MAX_ITEM_COUNT_FOR_PAIRING,
 } from './pairedItemUtils';
-import { type ITaskData } from 'n8n-workflow';
 
 const MOCK_EXECUTION: Partial<IExecutionResponse> = {
 	data: {
 		startData: {},
 		resultData: {
 			runData: {
-				'When clicking ‘Execute workflow’': [
+				'When clicking ‘Test workflow’': [
 					{
 						startTime: 1706027170005,
-						executionIndex: 0,
 						executionTime: 0,
 						source: [],
 						executionStatus: 'success',
@@ -25,9 +23,8 @@ const MOCK_EXECUTION: Partial<IExecutionResponse> = {
 				DebugHelper: [
 					{
 						startTime: 1706027170005,
-						executionIndex: 1,
 						executionTime: 1,
-						source: [{ previousNode: 'When clicking ‘Execute workflow’' }],
+						source: [{ previousNode: 'When clicking ‘Test workflow’' }],
 						executionStatus: 'success',
 						data: {
 							main: [
@@ -60,7 +57,6 @@ const MOCK_EXECUTION: Partial<IExecutionResponse> = {
 				If: [
 					{
 						startTime: 1706027170006,
-						executionIndex: 2,
 						executionTime: 1,
 						source: [{ previousNode: 'DebugHelper' }],
 						executionStatus: 'success',
@@ -97,7 +93,6 @@ const MOCK_EXECUTION: Partial<IExecutionResponse> = {
 				'Edit Fields': [
 					{
 						startTime: 1706027170008,
-						executionIndex: 3,
 						executionTime: 0,
 						source: [{ previousNode: 'If', previousNodeOutput: 1 }],
 						executionStatus: 'success',
@@ -120,7 +115,6 @@ const MOCK_EXECUTION: Partial<IExecutionResponse> = {
 					},
 					{
 						startTime: 1706027170009,
-						executionIndex: 3,
 						executionTime: 0,
 						source: [{ previousNode: 'If' }],
 						executionStatus: 'success',
@@ -145,7 +139,6 @@ const MOCK_EXECUTION: Partial<IExecutionResponse> = {
 				'Edit Fields1': [
 					{
 						startTime: 1706027170008,
-						executionIndex: 4,
 						executionTime: 0,
 						source: [{ previousNode: 'Edit Fields' }],
 						executionStatus: 'success',
@@ -168,7 +161,6 @@ const MOCK_EXECUTION: Partial<IExecutionResponse> = {
 					},
 					{
 						startTime: 1706027170010,
-						executionIndex: 5,
 						executionTime: 0,
 						source: [{ previousNode: 'Edit Fields', previousNodeRun: 1 }],
 						executionStatus: 'success',
@@ -266,54 +258,54 @@ describe('pairedItemUtils', () => {
 			const actual = getPairedItemsMapping(MOCK_EXECUTION);
 			const expected = {
 				DebugHelper_r0_o0_i0: new Set([
-					'When clicking ‘Execute workflow’_r0_o0_i0',
+					'When clicking ‘Test workflow’_r0_o0_i0',
 					'If_r0_o0_i0',
 					'Edit Fields_r1_o0_i0',
 					'Edit Fields1_r1_o0_i0',
 				]),
 				DebugHelper_r0_o0_i1: new Set([
-					'When clicking ‘Execute workflow’_r0_o0_i0',
+					'When clicking ‘Test workflow’_r0_o0_i0',
 					'If_r0_o1_i0',
 					'Edit Fields_r0_o0_i0',
 					'Edit Fields1_r0_o0_i0',
 				]),
 				'Edit Fields1_r0_o0_i0': new Set([
-					'When clicking ‘Execute workflow’_r0_o0_i0',
+					'When clicking ‘Test workflow’_r0_o0_i0',
 					'DebugHelper_r0_o0_i1',
 					'If_r0_o1_i0',
 					'Edit Fields_r0_o0_i0',
 				]),
 				'Edit Fields1_r1_o0_i0': new Set([
-					'When clicking ‘Execute workflow’_r0_o0_i0',
+					'When clicking ‘Test workflow’_r0_o0_i0',
 					'DebugHelper_r0_o0_i0',
 					'If_r0_o0_i0',
 					'Edit Fields_r1_o0_i0',
 				]),
 				'Edit Fields_r0_o0_i0': new Set([
-					'When clicking ‘Execute workflow’_r0_o0_i0',
+					'When clicking ‘Test workflow’_r0_o0_i0',
 					'DebugHelper_r0_o0_i1',
 					'If_r0_o1_i0',
 					'Edit Fields1_r0_o0_i0',
 				]),
 				'Edit Fields_r1_o0_i0': new Set([
-					'When clicking ‘Execute workflow’_r0_o0_i0',
+					'When clicking ‘Test workflow’_r0_o0_i0',
 					'DebugHelper_r0_o0_i0',
 					'If_r0_o0_i0',
 					'Edit Fields1_r1_o0_i0',
 				]),
 				If_r0_o0_i0: new Set([
-					'When clicking ‘Execute workflow’_r0_o0_i0',
+					'When clicking ‘Test workflow’_r0_o0_i0',
 					'DebugHelper_r0_o0_i0',
 					'Edit Fields_r1_o0_i0',
 					'Edit Fields1_r1_o0_i0',
 				]),
 				If_r0_o1_i0: new Set([
-					'When clicking ‘Execute workflow’_r0_o0_i0',
+					'When clicking ‘Test workflow’_r0_o0_i0',
 					'DebugHelper_r0_o0_i1',
 					'Edit Fields_r0_o0_i0',
 					'Edit Fields1_r0_o0_i0',
 				]),
-				'When clicking ‘Execute workflow’_r0_o0_i0': new Set([
+				'When clicking ‘Test workflow’_r0_o0_i0': new Set([
 					'DebugHelper_r0_o0_i0',
 					'DebugHelper_r0_o0_i1',
 					'If_r0_o0_i0',
@@ -336,7 +328,6 @@ describe('pairedItemUtils', () => {
 							Start: [
 								{
 									startTime: 1706027170005,
-									executionIndex: 0,
 									executionTime: 0,
 									source: [],
 									executionStatus: 'success',
@@ -348,7 +339,6 @@ describe('pairedItemUtils', () => {
 							DebugHelper: [
 								{
 									startTime: 1706027170005,
-									executionIndex: 1,
 									executionTime: 1,
 									source: [{ previousNode: 'Start' }],
 									executionStatus: 'success',
@@ -403,43 +393,6 @@ describe('pairedItemUtils', () => {
 				json: {},
 				pairedItem: { item: 0 },
 			});
-
-			expect(getPairedItemsMapping(mockExecution)).toEqual({});
-		});
-
-		it('should abort mapping and return empty object if execution has too many pairs', () => {
-			const nodeCount = 10;
-			const runCount = 3;
-			const itemCountPerRun = 3;
-			const pairedItemCount = 3;
-			const mockExecution: Partial<IExecutionResponse> = {
-				data: {
-					resultData: {
-						runData: Object.fromEntries(
-							Array.from({ length: nodeCount }).map<[string, ITaskData[]]>((_, j) => [
-								`node_${j}`,
-								Array.from({ length: runCount }).map((_, executionIndex) => ({
-									startTime: 1706027170005,
-									executionIndex,
-									executionTime: 0,
-									source: j === 0 ? [] : [{ previousNode: `node_${j - 1}` }],
-									executionStatus: 'success',
-									data: {
-										main: [
-											Array.from({ length: itemCountPerRun }).map(() => ({
-												json: {},
-												pairedItem: Array.from({ length: pairedItemCount }).map((__, i) => ({
-													item: i,
-												})),
-											})),
-										],
-									},
-								})),
-							]),
-						),
-					},
-				},
-			};
 
 			expect(getPairedItemsMapping(mockExecution)).toEqual({});
 		});

@@ -37,7 +37,7 @@ export function updateDynamicConnections(
 			parameterData.name === 'parameters.options.fallbackOutput'
 		) {
 			const curentFallbackOutput = (node.parameters?.options as { fallbackOutput: string })
-				?.fallbackOutput;
+				?.fallbackOutput as string;
 			if (curentFallbackOutput === 'extra') {
 				if (!parameterData.value || parameterData.value !== 'extra') {
 					connections[node.name].main = connections[node.name].main.slice(0, -1);
@@ -103,8 +103,8 @@ export function updateDynamicConnections(
 					const newRulesvalues = parameterData.value as IDataObject[];
 					const updatedConnectionsIndex: number[] = [];
 
-					for (const newRule of newRulesvalues) {
-						const index = curentRulesvalues.findIndex((rule) => isEqual(rule, newRule));
+					for (const rule of curentRulesvalues) {
+						const index = newRulesvalues.findIndex((newRule) => isEqual(rule, newRule));
 						if (index !== -1) {
 							updatedConnectionsIndex.push(index);
 						}

@@ -1,13 +1,11 @@
 import type {
-	LoginRequestDto,
 	PasswordUpdateRequestDto,
 	SettingsUpdateRequestDto,
 	UserUpdateRequestDto,
 } from '@n8n/api-types';
 import type { UpdateGlobalRolePayload } from '@/api/users';
 import * as usersApi from '@/api/users';
-import { BROWSER_ID_STORAGE_KEY, PERSONALIZATION_MODAL_KEY, ROLE } from '@/constants';
-import { STORES } from '@n8n/stores';
+import { BROWSER_ID_STORAGE_KEY, PERSONALIZATION_MODAL_KEY, STORES, ROLE } from '@/constants';
 import type {
 	Cloud,
 	IPersonalizationLatestVersion,
@@ -18,7 +16,7 @@ import type {
 } from '@/Interface';
 import { getPersonalizedNodeTypes } from '@/utils/userUtils';
 import { defineStore } from 'pinia';
-import { useRootStore } from '@n8n/stores/useRootStore';
+import { useRootStore } from '@/stores/root.store';
 import { usePostHog } from './posthog.store';
 import { useUIStore } from './ui.store';
 import { useCloudPlanStore } from './cloudPlan.store';
@@ -183,7 +181,12 @@ export const useUsersStore = defineStore(STORES.USERS, () => {
 		};
 	};
 
-	const loginWithCreds = async (params: LoginRequestDto) => {
+	const loginWithCreds = async (params: {
+		email: string;
+		password: string;
+		mfaCode?: string;
+		mfaRecoveryCode?: string;
+	}) => {
 		const user = await usersApi.login(rootStore.restApiContext, params);
 		if (!user) {
 			return;

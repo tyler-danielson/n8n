@@ -1,5 +1,4 @@
 <script lang="ts" setup>
-import { N8nTooltip } from '@n8n/design-system';
 import TextWithHighlights from './TextWithHighlights.vue';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 
@@ -13,20 +12,14 @@ type Props = {
 	id: string;
 	icon: string;
 	collapsable?: boolean;
-	nodeName?: string;
 	nodeType?: string;
 	highlight?: boolean;
 	draggable?: boolean;
 	collapsed?: boolean;
 	search?: string;
-	preview?: boolean;
-	locked?: boolean;
-	lockedTooltip?: string;
-	runIndex?: number;
 };
 
 const props = defineProps<Props>();
-
 const emit = defineEmits<{
 	click: [];
 }>();
@@ -47,28 +40,14 @@ const emit = defineEmits<{
 			:data-nest-level="level"
 			:data-value="expression"
 			:data-node-type="nodeType"
-			:data-target="!locked && 'mappable'"
-			:data-node-name="nodeName"
-			:data-run-index="runIndex"
+			data-target="mappable"
 			class="pill"
-			:class="{
-				'pill--highlight': highlight,
-				'pill--preview': preview,
-				'pill--locked': locked,
-			}"
+			:class="{ 'pill--highlight': highlight }"
 			data-test-id="run-data-schema-node-name"
 		>
 			<FontAwesomeIcon class="type-icon" :icon size="sm" />
 			<TextWithHighlights class="title" :content="title" :search="props.search" />
 		</div>
-
-		<N8nTooltip v-if="locked" :disabled="!lockedTooltip" :popper-class="$style.tooltip">
-			<template #content>
-				<span v-n8n-html="lockedTooltip" />
-			</template>
-			<N8nIcon class="locked-icon" icon="lock" size="small" />
-		</N8nTooltip>
-
 		<TextWithHighlights
 			data-test-id="run-data-schema-item-value"
 			class="text"
@@ -97,7 +76,6 @@ const emit = defineEmits<{
 	justify-content: center;
 	cursor: pointer;
 	font-size: var(--font-size-s);
-	color: var(--color-text-light);
 }
 
 .pill {
@@ -111,37 +89,11 @@ const emit = defineEmits<{
 	color: var(--color-text-dark);
 	max-width: 50%;
 	align-items: center;
-
 	> *:not(:first-child) {
 		margin-left: var(--spacing-3xs);
 		padding-left: var(--spacing-3xs);
 		border-left: 1px solid var(--color-foreground-light);
 	}
-
-	&.pill--preview {
-		/* Cannot use CSS variable inside data URL, so instead switching based on data-theme and media query */
-		--schema-preview-dashed-border: url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' viewBox='0 0 400 400' fill='none' rx='4' ry='4' stroke='%230000002A' stroke-width='2' stroke-dasharray='4%2c 4' stroke-dashoffset='0' stroke-linecap='square'/%3e%3c/svg%3e");
-		--schema-preview-dashed-border-dark: url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' viewBox='0 0 400 400' fill='none' rx='4' ry='4' stroke='%23FFFFFF2A' stroke-width='2' stroke-dasharray='4%2c 4' stroke-dashoffset='0' stroke-linecap='square'/%3e%3c/svg%3e");
-		color: var(--color-text-light);
-		background-color: var(--color-run-data-background);
-		border: none;
-		max-width: calc(100% - var(--spacing-l));
-		background-image: var(--schema-preview-dashed-border);
-
-		.title {
-			color: var(--color-text-light);
-		}
-	}
-}
-
-@media (prefers-color-scheme: dark) {
-	body:not([data-theme]) .pill--preview {
-		background-image: var(--schema-preview-dashed-border-dark);
-	}
-}
-
-[data-theme='dark'] .pill--preview {
-	background-image: var(--schema-preview-dashed-border-dark);
 }
 
 .draggable .pill.pill--highlight {
@@ -154,22 +106,17 @@ const emit = defineEmits<{
 	color: var(--color-primary);
 }
 
-.draggable .pill:not(.pill--locked) {
+.draggable .pill {
 	cursor: grab;
 }
 
-.draggable .pill:not(.pill--locked):hover {
+.draggable .pill:hover {
 	background-color: var(--color-background-light);
 	border-color: var(--color-foreground-base);
 }
 
 .type-icon {
 	color: var(--color-text-light);
-}
-
-.locked-icon {
-	color: var(--color-text-light);
-	margin-left: var(--spacing-2xs);
 }
 
 .title {
@@ -191,15 +138,5 @@ const emit = defineEmits<{
 }
 .collapsed {
 	transform: rotateZ(-90deg);
-}
-
-.tooltip {
-	max-width: 260px;
-}
-</style>
-
-<style lang="css" module>
-.tooltip {
-	max-width: 260px;
 }
 </style>

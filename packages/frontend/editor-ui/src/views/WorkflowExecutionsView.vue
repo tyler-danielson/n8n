@@ -13,8 +13,8 @@ import { useRoute, useRouter } from 'vue-router';
 import type { ExecutionSummary } from 'n8n-workflow';
 import { useDebounce } from '@/composables/useDebounce';
 import { useTelemetry } from '@/composables/useTelemetry';
-import { useCanvasOperations } from '@/composables/useCanvasOperations';
-import { executionRetryMessage } from '@/utils/executionUtils';
+import { useWorkflowHelpers } from '@/composables/useWorkflowHelpers';
+import { useNodeHelpers } from '@/composables/useNodeHelpers';
 
 const executionsStore = useExecutionsStore();
 const workflowsStore = useWorkflowsStore();
@@ -26,7 +26,8 @@ const router = useRouter();
 const toast = useToast();
 const { callDebounced } = useDebounce();
 
-const { initializeWorkspace } = useCanvasOperations({ router });
+const workflowHelpers = useWorkflowHelpers({ router });
+const nodeHelpers = useNodeHelpers();
 
 const loading = ref(false);
 const loadingMore = ref(false);
@@ -126,7 +127,6 @@ async function initializeRoute() {
 			.replace({
 				name: VIEWS.EXECUTION_PREVIEW,
 				params: { name: workflow.value.id, executionId: executions.value[0].id },
-				query: route.query,
 			})
 			.catch(() => {});
 	}
@@ -139,7 +139,8 @@ async function fetchWorkflow() {
 			try {
 				await workflowsStore.fetchActiveWorkflows();
 				const data = await workflowsStore.fetchWorkflow(workflowId.value);
-				initializeWorkspace(data);
+				workflowHelpers.initState(data);
+				await nodeHelpers.addNodes(data.nodes, data.connections);
 			} catch (error) {
 				toast.showError(error, i18n.baseText('nodeView.showError.openWorkflow.title'));
 			}
@@ -278,12 +279,18 @@ async function onExecutionRetry(payload: { id: string; loadWorkflow: boolean }) 
 
 async function retryExecution(payload: { id: string; loadWorkflow: boolean }) {
 	try {
-		const retryStatus = await executionsStore.retryExecution(payload.id, payload.loadWorkflow);
+		const retrySuccessful = await executionsStore.retryExecution(payload.id, payload.loadWorkflow);
 
-		const retryMessage = executionRetryMessage(retryStatus);
-
-		if (retryMessage) {
-			toast.showMessage(retryMessage);
+		if (retrySuccessful) {
+			toast.showMessage({
+				title: i18n.baseText('executionsList.showMessage.retrySuccessfulTrue.title'),
+				type: 'success',
+			});
+		} else {
+			toast.showMessage({
+				title: i18n.baseText('executionsList.showMessage.retrySuccessfulFalse.title'),
+				type: 'error',
+			});
 		}
 	} catch (error) {
 		toast.showError(error, i18n.baseText('executionsList.showError.retryExecution.title'));

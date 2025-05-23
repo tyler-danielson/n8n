@@ -6,7 +6,6 @@ import {
 	AI_NODE_CREATOR_VIEW,
 	REGULAR_NODE_CREATOR_VIEW,
 	TRIGGER_NODE_CREATOR_VIEW,
-	AI_UNCATEGORIZED_CATEGORY,
 } from '@/constants';
 
 import { useNodeCreatorStore } from '@/stores/nodeCreator.store';
@@ -19,13 +18,6 @@ import ActionsRenderer from '../Modes/ActionsMode.vue';
 import NodesRenderer from '../Modes/NodesMode.vue';
 import { useI18n } from '@/composables/useI18n';
 import { useDebounce } from '@/composables/useDebounce';
-import NodeIcon from '@/components/NodeIcon.vue';
-
-import CommunityNodeDetails from './CommunityNodeDetails.vue';
-import CommunityNodeInfo from './CommunityNodeInfo.vue';
-import CommunityNodeDocsLink from './CommunityNodeDocsLink.vue';
-import CommunityNodeFooter from './CommunityNodeFooter.vue';
-import { useUsersStore } from '@/stores/users.store';
 
 const i18n = useI18n();
 const { callDebounced } = useDebounce();
@@ -35,42 +27,20 @@ const { pushViewStack, popViewStack, updateCurrentViewStack } = useViewStacks();
 const { setActiveItemIndex, attachKeydownEvent, detachKeydownEvent } = useKeyboardNavigation();
 const nodeCreatorStore = useNodeCreatorStore();
 
-const { isInstanceOwner } = useUsersStore();
-
 const activeViewStack = computed(() => useViewStacks().activeViewStack);
-
-const communityNodeDetails = computed(() => activeViewStack.value.communityNodeDetails);
 
 const viewStacks = computed(() => useViewStacks().viewStacks);
 
 const isActionsMode = computed(() => useViewStacks().activeViewStackMode === 'actions');
-
-const searchPlaceholder = computed(() => {
-	let node = activeViewStack.value?.title as string;
-
-	if (communityNodeDetails.value) {
-		node = communityNodeDetails.value.title;
-	}
-
-	if (isActionsMode.value) {
-		return i18n.baseText('nodeCreator.actionsCategory.searchActions', {
-			interpolate: { node },
-		});
-	}
-
-	return i18n.baseText('nodeCreator.searchBar.searchNodes');
-});
-
-const showSearchBar = computed(() => {
-	if (activeViewStack.value.communityNodeDetails) return false;
-	return activeViewStack.value.hasSearch;
-});
+const searchPlaceholder = computed(() =>
+	isActionsMode.value
+		? i18n.baseText('nodeCreator.actionsCategory.searchActions', {
+				interpolate: { node: activeViewStack.value.title as string },
+			})
+		: i18n.baseText('nodeCreator.searchBar.searchNodes'),
+);
 
 const nodeCreatorView = computed(() => useNodeCreatorStore().selectedView);
-
-const isCommunityNodeActionsMode = computed(() => {
-	return communityNodeDetails.value && isActionsMode.value && activeViewStack.value.subcategory;
-});
 
 function getDefaultActiveIndex(search: string = ''): number {
 	if (activeViewStack.value.mode === 'actions') {
@@ -125,7 +95,6 @@ watch(
 			[REGULAR_NODE_CREATOR_VIEW]: RegularView,
 			[AI_NODE_CREATOR_VIEW]: AIView,
 			[AI_OTHERS_NODE_CREATOR_VIEW]: AINodesView,
-			[AI_UNCATEGORIZED_CATEGORY]: AINodesView,
 		};
 
 		const itemKey = selectedView;
@@ -184,20 +153,18 @@ function onBackButton() {
 					>
 						<font-awesome-icon :class="$style.backButtonIcon" icon="arrow-left" size="2x" />
 					</button>
-					<NodeIcon
+					<n8n-node-icon
 						v-if="activeViewStack.nodeIcon"
 						:class="$style.nodeIcon"
-						:icon-source="activeViewStack.nodeIcon"
+						:type="activeViewStack.nodeIcon.iconType || 'unknown'"
+						:src="activeViewStack.nodeIcon.icon"
+						:name="activeViewStack.nodeIcon.icon"
+						:color="activeViewStack.nodeIcon.color"
 						:circle="false"
 						:show-tooltip="false"
 						:size="20"
 					/>
 					<p v-if="activeViewStack.title" :class="$style.title" v-text="activeViewStack.title" />
-
-					<CommunityNodeDocsLink
-						v-if="communityNodeDetails"
-						:package-name="communityNodeDetails.packageName"
-					/>
 				</div>
 				<p
 					v-if="activeViewStack.subtitle"
@@ -205,9 +172,8 @@ function onBackButton() {
 					v-text="activeViewStack.subtitle"
 				/>
 			</header>
-
 			<SearchBar
-				v-if="showSearchBar"
+				v-if="activeViewStack.hasSearch"
 				:class="$style.searchBar"
 				:placeholder="
 					searchPlaceholder ? searchPlaceholder : i18n.baseText('nodeCreator.searchBar.searchNodes')
@@ -215,10 +181,6 @@ function onBackButton() {
 				:model-value="activeViewStack.search"
 				@update:model-value="onSearch"
 			/>
-
-			<CommunityNodeDetails v-if="communityNodeDetails" />
-			<CommunityNodeInfo v-if="communityNodeDetails && !isActionsMode" />
-
 			<div :class="$style.renderedItems">
 				<n8n-notice
 					v-if="activeViewStack.info && !activeViewStack.search"
@@ -232,12 +194,6 @@ function onBackButton() {
 				<!-- Nodes Mode -->
 				<NodesRenderer v-else :root-view="nodeCreatorView" v-bind="$attrs" />
 			</div>
-
-			<CommunityNodeFooter
-				v-if="communityNodeDetails && !isCommunityNodeActionsMode"
-				:package-name="communityNodeDetails.packageName"
-				:show-manage="communityNodeDetails.installed && isInstanceOwner"
-			/>
 		</aside>
 	</transition>
 </template>
@@ -304,7 +260,7 @@ function onBackButton() {
 	height: 100%;
 	background-color: $node-creator-background-color;
 	--color-background-node-icon-badge: var(--color-background-xlight);
-	width: var(--node-creator-width);
+	width: 385px;
 	display: flex;
 	flex-direction: column;
 
@@ -347,7 +303,6 @@ function onBackButton() {
 	line-height: 24px;
 	font-weight: var(--font-weight-bold);
 	font-size: var(--font-size-l);
-	margin: 0;
 
 	.hasBg & {
 		font-size: var(--font-size-s-m);

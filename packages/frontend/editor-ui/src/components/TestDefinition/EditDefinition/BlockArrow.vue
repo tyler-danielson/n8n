@@ -1,32 +1,40 @@
-<script setup lang="ts"></script>
-
 <template>
-	<div :class="$style.blockArrow">
-		<div :class="$style.stalk"></div>
-		<div :class="$style.arrowHead"></div>
-	</div>
+	<div :class="$style.arrowConnector"></div>
 </template>
 
 <style module lang="scss">
-.blockArrow {
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-}
+.arrowConnector {
+	$arrow-width: 12px;
+	$arrow-height: 8px;
+	$stalk-width: 2px;
+	$color: var(--color-text-dark);
 
-.stalk {
-	min-height: 14px;
-	width: 2px;
-	background-color: var(--color-foreground-xdark);
-	flex: 1;
-}
+	position: relative;
+	height: var(--arrow-height, 3rem);
+	margin: 0.5rem 0;
 
-.arrowHead {
-	width: 0;
-	height: 0;
-	border-left: 5px solid transparent;
-	border-right: 5px solid transparent;
+	&::before,
+	&::after {
+		content: '';
+		position: absolute;
+		left: 50%;
+		transform: translateX(-50%);
+	}
 
-	border-top: 10px solid var(--color-foreground-xdark);
+	&::before {
+		top: 0;
+		width: $stalk-width;
+		height: calc(100% - #{$arrow-height});
+		background-color: $color;
+	}
+
+	&::after {
+		bottom: 0;
+		width: 0;
+		height: 0;
+		border-left: calc($arrow-width / 2) solid transparent;
+		border-right: calc($arrow-width / 2) solid transparent;
+		border-top: $arrow-height solid $color;
+	}
 }
 </style>

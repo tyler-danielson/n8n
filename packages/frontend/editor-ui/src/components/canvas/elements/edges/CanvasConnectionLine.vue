@@ -5,8 +5,8 @@ import { BaseEdge } from '@vue-flow/core';
 import { computed, onMounted, ref, useCssModule } from 'vue';
 import { getEdgeRenderData } from './utils';
 import { useCanvas } from '@/composables/useCanvas';
-import { NodeConnectionTypes } from 'n8n-workflow';
-import { parseCanvasConnectionHandleString } from '@/utils/canvasUtils';
+import { NodeConnectionType } from 'n8n-workflow';
+import { parseCanvasConnectionHandleString } from '@/utils/canvasUtilsV2';
 
 const props = defineProps<ConnectionLineProps>();
 
@@ -26,7 +26,7 @@ const classes = computed(() => {
 });
 
 const edgeColor = computed(() => {
-	if (connectionType.value !== NodeConnectionTypes.Main) {
+	if (connectionType.value !== NodeConnectionType.Main) {
 		return 'var(--node-type-supplemental-color)';
 	} else {
 		return 'var(--color-foreground-xdark)';
@@ -34,7 +34,7 @@ const edgeColor = computed(() => {
 });
 
 const edgeStyle = computed(() => ({
-	...(connectionType.value === NodeConnectionTypes.Main ? {} : { strokeDasharray: '8,8' }),
+	...(connectionType.value === NodeConnectionType.Main ? {} : { strokeDasharray: '8,8' }),
 	strokeWidth: 2,
 	stroke: edgeColor.value,
 }));

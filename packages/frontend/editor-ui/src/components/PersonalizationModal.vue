@@ -84,10 +84,9 @@ import {
 import { useToast } from '@/composables/useToast';
 import Modal from '@/components/Modal.vue';
 import type { IFormInputs, IPersonalizationLatestVersion } from '@/Interface';
-import { useRootStore } from '@n8n/stores/useRootStore';
+import { useRootStore } from '@/stores/root.store';
 import { useUsersStore } from '@/stores/users.store';
-import { createFormEventBus } from '@n8n/design-system/utils';
-import { createEventBus } from '@n8n/utils/event-bus';
+import { createEventBus, createFormEventBus } from 'n8n-design-system/utils';
 import { usePostHog } from '@/stores/posthog.store';
 import { useExternalHooks } from '@/composables/useExternalHooks';
 import { useI18n } from '@/composables/useI18n';
@@ -567,7 +566,6 @@ const closeDialog = () => {
 			name: COMMUNITY_PLUS_ENROLLMENT_MODAL,
 			data: {
 				closeCallback,
-				customHeading: undefined,
 			},
 		});
 	} else {

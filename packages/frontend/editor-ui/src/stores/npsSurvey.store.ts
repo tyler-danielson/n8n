@@ -8,13 +8,13 @@ import {
 	NPS_SURVEY_MODAL_KEY,
 	CONTACT_PROMPT_MODAL_KEY,
 } from '@/constants';
-import { useRootStore } from '@n8n/stores/useRootStore';
+import { useRootStore } from './root.store';
 import type { IUserSettings, NpsSurveyState } from 'n8n-workflow';
 import { useSettingsStore } from './settings.store';
 import { updateNpsSurveyState } from '@/api/npsSurvey';
 import type { IN8nPrompts } from '@/Interface';
 import { getPromptsData } from '@/api/settings';
-import { assert } from '@n8n/utils/assert';
+import { assert } from '@/utils/assert';
 
 export const MAXIMUM_TIMES_TO_SHOW_SURVEY_IF_IGNORED = 3;
 

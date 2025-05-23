@@ -2,7 +2,7 @@ import { computed, reactive } from 'vue';
 import { defineStore } from 'pinia';
 import type { UsageState } from '@/Interface';
 import * as usageApi from '@/api/usage';
-import { useRootStore } from '@n8n/stores/useRootStore';
+import { useRootStore } from '@/stores/root.store';
 import { useSettingsStore } from '@/stores/settings.store';
 
 export type UsageTelemetry = {
@@ -35,7 +35,7 @@ export const useUsageStore = defineStore('usage', () => {
 	const rootStore = useRootStore();
 	const settingsStore = useSettingsStore();
 
-	const state = reactive<UsageState>({ ...DEFAULT_STATE });
+	const state = reactive<UsageState>(DEFAULT_STATE);
 
 	const planName = computed(() => state.data.license.planName || DEFAULT_PLAN_NAME);
 	const planId = computed(() => state.data.license.planId);

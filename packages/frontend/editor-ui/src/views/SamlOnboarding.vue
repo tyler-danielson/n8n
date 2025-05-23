@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 import { reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import type { IFormBoxConfig } from '@n8n/design-system';
+import type { IFormBoxConfig } from 'n8n-design-system';
 import AuthView from '@/views/AuthView.vue';
 import { VIEWS } from '@/constants';
 import { useI18n } from '@/composables/useI18n';

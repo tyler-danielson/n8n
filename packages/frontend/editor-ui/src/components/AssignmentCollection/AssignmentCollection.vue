@@ -5,10 +5,10 @@ import { useNDVStore } from '@/stores/ndv.store';
 import type {
 	AssignmentCollectionValue,
 	AssignmentValue,
-	FieldTypeMap,
 	INode,
 	INodeProperties,
 } from 'n8n-workflow';
+import { v4 as uuid } from 'uuid';
 import { computed, reactive, watch } from 'vue';
 import DropArea from '../DropArea/DropArea.vue';
 import ParameterOptions from '../ParameterOptions.vue';
@@ -21,17 +21,11 @@ interface Props {
 	parameter: INodeProperties;
 	value: AssignmentCollectionValue;
 	path: string;
-	defaultType?: keyof FieldTypeMap;
-	disableType?: boolean;
 	node: INode | null;
 	isReadOnly?: boolean;
 }
 
-const props = withDefaults(defineProps<Props>(), {
-	isReadOnly: false,
-	defaultType: undefined,
-	disableType: false,
-});
+const props = withDefaults(defineProps<Props>(), { isReadOnly: false });
 
 const emit = defineEmits<{
 	valueChanged: [value: { name: string; node: string; value: AssignmentCollectionValue }];
@@ -41,11 +35,7 @@ const i18n = useI18n();
 
 const state = reactive<{ paramValue: AssignmentCollectionValue }>({
 	paramValue: {
-		assignments:
-			props.value.assignments?.map((assignment) => {
-				if (!assignment.id) assignment.id = crypto.randomUUID();
-				return assignment;
-			}) ?? [],
+		assignments: props.value.assignments ?? [],
 	},
 });
 
@@ -85,20 +75,15 @@ watch(state.paramValue, (value) => {
 });
 
 function addAssignment(): void {
-	state.paramValue.assignments.push({
-		id: crypto.randomUUID(),
-		name: '',
-		value: '',
-		type: props.defaultType ?? 'string',
-	});
+	state.paramValue.assignments.push({ id: uuid(), name: '', value: '', type: 'string' });
 }
 
 function dropAssignment(expression: string): void {
 	state.paramValue.assignments.push({
-		id: crypto.randomUUID(),
+		id: uuid(),
 		name: propertyNameFromExpression(expression),
 		value: `=${expression}`,
-		type: props.defaultType ?? typeFromExpression(expression),
+		type: typeFromExpression(expression),
 	});
 }
 
@@ -160,11 +145,10 @@ function optionSelected(action: string) {
 						<Assignment
 							:model-value="assignment"
 							:index="index"
-							:path="`${path}.assignments.${index}`"
+							:path="`${path}.${index}`"
 							:issues="getIssues(index)"
 							:class="$style.assignment"
 							:is-read-only="isReadOnly"
-							:disable-type="disableType"
 							@update:model-value="(value) => onAssignmentUpdate(index, value)"
 							@remove="() => onAssignmentRemove(index)"
 						>

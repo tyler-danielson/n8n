@@ -21,7 +21,7 @@ defineProps<Props>();
 	letter-spacing: 1px;
 	padding-top: var(--spacing-s);
 	font-style: normal;
-	font-weight: var(--font-weight-bold);
+	font-weight: 700;
 	font-size: 10px;
 	line-height: 12px;
 	text-transform: uppercase;

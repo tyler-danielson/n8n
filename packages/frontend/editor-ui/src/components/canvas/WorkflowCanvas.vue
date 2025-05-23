@@ -4,11 +4,10 @@ import { computed, ref, toRef, useCssModule } from 'vue';
 import type { Workflow } from 'n8n-workflow';
 import type { IWorkflowDb } from '@/Interface';
 import { useCanvasMapping } from '@/composables/useCanvasMapping';
-import type { EventBus } from '@n8n/utils/event-bus';
-import { createEventBus } from '@n8n/utils/event-bus';
+import type { EventBus } from 'n8n-design-system';
+import { createEventBus } from 'n8n-design-system';
 import type { CanvasEventBusEvents } from '@/types';
 import { useVueFlow } from '@vue-flow/core';
-import { throttledRef } from '@vueuse/core';
 
 defineOptions({
 	inheritAttrs: false,
@@ -24,6 +23,7 @@ const props = withDefaults(
 		eventBus?: EventBus<CanvasEventBusEvents>;
 		readOnly?: boolean;
 		executing?: boolean;
+		showBugReportingButton?: boolean;
 	}>(),
 	{
 		id: 'canvas',
@@ -60,9 +60,6 @@ onNodesInitialized(() => {
 		initialFitViewDone.value = true;
 	}
 });
-
-const mappedNodesThrottled = throttledRef(mappedNodes, 200);
-const mappedConnectionsThrottled = throttledRef(mappedConnections, 200);
 </script>
 
 <template>
@@ -71,8 +68,9 @@ const mappedConnectionsThrottled = throttledRef(mappedConnections, 200);
 			<Canvas
 				v-if="workflow"
 				:id="id"
-				:nodes="executing ? mappedNodesThrottled : mappedNodes"
-				:connections="executing ? mappedConnectionsThrottled : mappedConnections"
+				:nodes="mappedNodes"
+				:connections="mappedConnections"
+				:show-bug-reporting-button="showBugReportingButton"
 				:event-bus="eventBus"
 				:read-only="readOnly"
 				v-bind="$attrs"

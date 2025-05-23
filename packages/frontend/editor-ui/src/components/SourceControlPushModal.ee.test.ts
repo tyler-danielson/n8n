@@ -4,12 +4,11 @@ import { useRoute } from 'vue-router';
 import { createComponentRenderer } from '@/__tests__/render';
 import SourceControlPushModal from '@/components/SourceControlPushModal.ee.vue';
 import { createTestingPinia } from '@pinia/testing';
-import { createEventBus } from '@n8n/utils/event-bus';
-import type { SourceControlledFile } from '@n8n/api-types';
+import { createEventBus } from 'n8n-design-system';
+import type { SourceControlAggregatedFile } from '@/types/sourceControl.types';
 import { useSourceControlStore } from '@/stores/sourceControl.store';
 import { mockedStore } from '@/__tests__/utils';
 import { VIEWS } from '@/constants';
-import { useTelemetry } from '@/composables/useTelemetry';
 
 const eventBus = createEventBus();
 
@@ -23,39 +22,19 @@ vi.mock('vue-router', () => ({
 	useRouter: vi.fn(),
 }));
 
-vi.mock('@/composables/useTelemetry', () => {
-	const track = vi.fn();
-	return {
-		useTelemetry: () => {
-			return {
-				track,
-			};
-		},
-	};
-});
-
 let route: ReturnType<typeof useRoute>;
-let telemetry: ReturnType<typeof useTelemetry>;
 
-const DynamicScrollerStub = {
+const RecycleScroller = {
 	props: {
 		items: Array,
 	},
 	template: '<div><template v-for="item in items"><slot v-bind="{ item }"></slot></template></div>',
-	methods: {
-		scrollToItem: vi.fn(),
-	},
-};
-
-const DynamicScrollerItemStub = {
-	template: '<slot></slot>',
 };
 
 const renderModal = createComponentRenderer(SourceControlPushModal, {
 	global: {
 		stubs: {
-			DynamicScroller: DynamicScrollerStub,
-			DynamicScrollerItem: DynamicScrollerItemStub,
+			RecycleScroller,
 			Modal: {
 				template: `
 					<div>
@@ -72,9 +51,7 @@ const renderModal = createComponentRenderer(SourceControlPushModal, {
 
 describe('SourceControlPushModal', () => {
 	beforeEach(() => {
-		vi.clearAllMocks();
 		route = useRoute();
-		telemetry = useTelemetry();
 		createTestingPinia();
 	});
 
@@ -94,7 +71,7 @@ describe('SourceControlPushModal', () => {
 	});
 
 	it('should toggle checkboxes', async () => {
-		const status: SourceControlledFile[] = [
+		const status: SourceControlAggregatedFile[] = [
 			{
 				id: 'gTbbBkkYTnNyX1jD',
 				name: 'My workflow 1',
@@ -183,7 +160,7 @@ describe('SourceControlPushModal', () => {
 	});
 
 	it('should push non workflow entities', async () => {
-		const status: SourceControlledFile[] = [
+		const status: SourceControlAggregatedFile[] = [
 			{
 				id: 'gTbbBkkYTnNyX1jD',
 				name: 'credential',
@@ -214,21 +191,11 @@ describe('SourceControlPushModal', () => {
 				file: '/Users/raul/.n8n/git/tags.json',
 				updatedAt: '2024-12-04T11:29:22.095Z',
 			},
-			{
-				id: 'mappings',
-				name: 'folders',
-				type: 'folders',
-				status: 'modified',
-				location: 'local',
-				conflict: false,
-				file: '/Users/raul/.n8n/git/folders.json',
-				updatedAt: '2024-12-04T11:29:22.095Z',
-			},
 		];
 
 		const sourceControlStore = mockedStore(useSourceControlStore);
 
-		const { getByTestId, getByRole } = renderModal({
+		const { getByTestId, getByText } = renderModal({
 			props: {
 				data: {
 					eventBus,
@@ -240,10 +207,9 @@ describe('SourceControlPushModal', () => {
 		const submitButton = getByTestId('source-control-push-modal-submit');
 		const commitMessage = 'commit message';
 		expect(submitButton).toBeDisabled();
-		expect(getByRole('alert').textContent).toContain('Credentials: 1 added.');
-		expect(getByRole('alert').textContent).toContain('Variables: at least one new or modified.');
-		expect(getByRole('alert').textContent).toContain('Tags: at least one new or modified.');
-		expect(getByRole('alert').textContent).toContain('Folders: at least one new or modified.');
+		expect(getByText('1 new credentials added, 0 deleted and 0 changed')).toBeInTheDocument();
+		expect(getByText('At least one new variable has been added or modified')).toBeInTheDocument();
+		expect(getByText('At least one new tag has been added or modified')).toBeInTheDocument();
 
 		await userEvent.type(getByTestId('source-control-push-modal-commit'), commitMessage);
 
@@ -260,7 +226,7 @@ describe('SourceControlPushModal', () => {
 	});
 
 	it('should auto select currentWorkflow', async () => {
-		const status: SourceControlledFile[] = [
+		const status: SourceControlAggregatedFile[] = [
 			{
 				id: 'gTbbBkkYTnNyX1jD',
 				name: 'My workflow 1',
@@ -310,7 +276,7 @@ describe('SourceControlPushModal', () => {
 
 	describe('filters', () => {
 		it('should filter by name', async () => {
-			const status: SourceControlledFile[] = [
+			const status: SourceControlAggregatedFile[] = [
 				{
 					id: 'gTbbBkkYTnNyX1jD',
 					name: 'My workflow 1',
@@ -345,16 +311,13 @@ describe('SourceControlPushModal', () => {
 			expect(getAllByTestId('source-control-push-modal-file-checkbox')).toHaveLength(2);
 
 			await userEvent.type(getByTestId('source-control-push-search'), '1');
-			await waitFor(() => {
-				expect(getAllByTestId('source-control-push-modal-file-checkbox')).toHaveLength(1);
-				expect(telemetry.track).toHaveBeenCalledWith('User searched workflows in commit modal', {
-					search: '1',
-				});
-			});
+			await waitFor(() =>
+				expect(getAllByTestId('source-control-push-modal-file-checkbox')).toHaveLength(1),
+			);
 		});
 
 		it('should filter by status', async () => {
-			const status: SourceControlledFile[] = [
+			const status: SourceControlAggregatedFile[] = [
 				{
 					id: 'gTbbBkkYTnNyX1jD',
 					name: 'Created Workflow',
@@ -408,14 +371,11 @@ describe('SourceControlPushModal', () => {
 				const items = getAllByTestId('source-control-push-modal-file-checkbox');
 				expect(items).toHaveLength(1);
 				expect(items[0]).toHaveTextContent('Created Workflow');
-				expect(telemetry.track).toHaveBeenCalledWith('User filtered by status in commit modal', {
-					status: 'created',
-				});
 			});
 		});
 
 		it('should reset', async () => {
-			const status: SourceControlledFile[] = [
+			const status: SourceControlAggregatedFile[] = [
 				{
 					id: 'JIGKevgZagmJAnM6',
 					name: 'Modified workflow',

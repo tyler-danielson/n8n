@@ -1,5 +1,5 @@
 import type { IUpdateInformation } from '@/Interface';
-import { createEventBus } from '@n8n/utils/event-bus';
+import { createEventBus } from 'n8n-design-system/utils';
 
 export type Position = 'minLeft' | 'maxRight' | 'initial';
 
@@ -16,10 +16,6 @@ export interface NdvEventBusEvents {
 	setPositionByName: Position;
 
 	updateParameterValue: IUpdateInformation;
-
-	updateInputNodeName: string | undefined;
-
-	setInputBranchIndex: number;
 }
 
 export const ndvEventBus = createEventBus<NdvEventBusEvents>();

@@ -1,14 +1,182 @@
-import { NodeConnectionTypes } from 'n8n-workflow';
-import type { INodeUi, IWorkflowDataCreate } from './Interface';
+import { NodeConnectionType } from 'n8n-workflow';
+import type { INodeUi, WorkflowDataWithTemplateId } from './Interface';
 
-export const SAMPLE_SUBWORKFLOW_TRIGGER_ID = 'c055762a-8fe7-4141-a639-df2372f30060';
-export const SAMPLE_SUBWORKFLOW_WORKFLOW: IWorkflowDataCreate = {
-	name: 'My Sub-Workflow',
+export const EASY_AI_WORKFLOW_JSON: WorkflowDataWithTemplateId = {
+	name: 'Demo: My first AI Agent in n8n',
+	meta: {
+		templateId: 'PT1i+zU92Ii5O2XCObkhfHJR5h9rNJTpiCIkYJk9jHU=',
+	},
 	nodes: [
 		{
-			id: SAMPLE_SUBWORKFLOW_TRIGGER_ID,
+			id: '0d7e4666-bc0e-489a-9e8f-a5ef191f4954',
+			name: 'Google Calendar',
+			type: 'n8n-nodes-base.googleCalendarTool',
+			typeVersion: 1.2,
+			position: [880, 220],
+			parameters: {
+				operation: 'getAll',
+				calendar: {
+					__rl: true,
+					mode: 'list',
+				},
+				returnAll: true,
+				options: {
+					timeMin:
+						"={{ $fromAI('after', 'The earliest datetime we want to look for events for') }}",
+					timeMax: "={{ $fromAI('before', 'The latest datetime we want to look for events for') }}",
+					query:
+						"={{ $fromAI('query', 'The search query to look for in the calendar. Leave empty if no search query is needed') }}",
+					singleEvents: true,
+				},
+			},
+		},
+		{
+			id: '5b410409-5b0b-47bd-b413-5b9b1000a063',
+			name: 'When chat message received',
+			type: '@n8n/n8n-nodes-langchain.chatTrigger',
 			typeVersion: 1.1,
-			name: 'When Executed by Another Workflow',
+			position: [360, 20],
+			webhookId: 'a889d2ae-2159-402f-b326-5f61e90f602e',
+			parameters: {
+				options: {},
+			},
+		},
+		{
+			id: '29963449-1dc1-487d-96f2-7ff0a5c3cd97',
+			name: 'AI Agent',
+			type: '@n8n/n8n-nodes-langchain.agent',
+			typeVersion: 1.7,
+			position: [560, 20],
+			parameters: {
+				options: {
+					systemMessage:
+						"=You're a helpful assistant that the user to answer questions about their calendar.\n\nToday is {{ $now.format('cccc') }} the {{ $now.format('yyyy-MM-dd HH:mm') }}.",
+				},
+			},
+		},
+		{
+			id: 'eae35513-07c2-4de2-a795-a153b6934c1b',
+			name: 'Sticky Note',
+			type: 'n8n-nodes-base.stickyNote',
+			typeVersion: 1,
+			position: [0, 0],
+			parameters: {
+				content:
+					'## 👋 Welcome to n8n!\nThis example shows how to build an AI Agent that interacts with your \ncalendar.\n\n### 1. Connect your accounts\n- Set up your [OpenAI credentials](https://docs.n8n.io/integrations/builtin/credentials/openai/?utm_source=n8n_app&utm_medium=credential_settings&utm_campaign=create_new_credentials_modal) in the `OpenAI Model` node\n- Connect your Google account in the `Google Calendar` node credentials section\n\n### 2. Ready to test it?\nClick Chat below and start asking questions! For example you can try `What meetings do I have today?`',
+				height: 389,
+				width: 319,
+				color: 6,
+			},
+		},
+		{
+			id: '68b59889-7aca-49fd-a49b-d86fa6239b96',
+			name: 'Sticky Note1',
+			type: 'n8n-nodes-base.stickyNote',
+			typeVersion: 1,
+			position: [820, 200],
+			parameters: {
+				content:
+					"\n\n\n\n\n\n\n\n\n\n\n\nDon't have **Google Calendar**? Simply exchange this with the **Microsoft Outlook** or other tools",
+				height: 253,
+				width: 226,
+				color: 7,
+			},
+		},
+		{
+			id: 'cbaedf86-9153-4778-b893-a7e50d3e04ba',
+			name: 'OpenAI Model',
+			type: '@n8n/n8n-nodes-langchain.lmChatOpenAi',
+			typeVersion: 1,
+			position: [520, 220],
+			parameters: {
+				options: {},
+			},
+		},
+		{
+			id: '75481370-bade-4d90-a878-3a3b0201edcc',
+			name: 'Memory',
+			type: '@n8n/n8n-nodes-langchain.memoryBufferWindow',
+			typeVersion: 1.3,
+			position: [680, 220],
+			parameters: {},
+		},
+		{
+			id: '907552eb-6e0f-472e-9d90-4513a67a31db',
+			name: 'Sticky Note3',
+			type: 'n8n-nodes-base.stickyNote',
+			typeVersion: 1,
+			position: [0, 400],
+			parameters: {
+				content:
+					'### Want to learn more?\nWant to learn more about AI and how to apply it best in n8n? Have a look at our [new tutorial series on YouTube](https://www.youtube.com/watch?v=yzvLfHb0nqE&lc).',
+				height: 100,
+				width: 317,
+				color: 6,
+			},
+		},
+	] as INodeUi[],
+	connections: {
+		'Google Calendar': {
+			ai_tool: [
+				[
+					{
+						node: 'AI Agent',
+						type: NodeConnectionType.AiTool,
+						index: 0,
+					},
+				],
+			],
+		},
+		'When chat message received': {
+			main: [
+				[
+					{
+						node: 'AI Agent',
+						type: NodeConnectionType.Main,
+						index: 0,
+					},
+				],
+			],
+		},
+		'OpenAI Model': {
+			ai_languageModel: [
+				[
+					{
+						node: 'AI Agent',
+						type: NodeConnectionType.AiLanguageModel,
+						index: 0,
+					},
+				],
+			],
+		},
+		Memory: {
+			ai_memory: [
+				[
+					{
+						node: 'AI Agent',
+						type: NodeConnectionType.AiMemory,
+						index: 0,
+					},
+				],
+			],
+		},
+	},
+	settings: {
+		executionOrder: 'v1',
+	},
+	pinData: {},
+};
+
+export const SAMPLE_SUBWORKFLOW_WORKFLOW: WorkflowDataWithTemplateId = {
+	name: 'My Sub-Workflow',
+	meta: {
+		templateId: 'VMiAxXa3lCAizGB5f7dVZQSFfg3FtHkdTKvLuupqBls=',
+	},
+	nodes: [
+		{
+			id: 'c055762a-8fe7-4141-a639-df2372f30060',
+			typeVersion: 1.1,
+			name: 'Workflow Input Trigger',
 			type: 'n8n-nodes-base.executeWorkflowTrigger',
 			position: [260, 340],
 			parameters: {},
@@ -22,12 +190,12 @@ export const SAMPLE_SUBWORKFLOW_WORKFLOW: IWorkflowDataCreate = {
 		},
 	] as INodeUi[],
 	connections: {
-		'When Executed by Another Workflow': {
+		'Workflow Input Trigger': {
 			main: [
 				[
 					{
 						node: 'Replace me with your logic',
-						type: NodeConnectionTypes.Main,
+						type: NodeConnectionType.Main,
 						index: 0,
 					},
 				],
@@ -38,140 +206,4 @@ export const SAMPLE_SUBWORKFLOW_WORKFLOW: IWorkflowDataCreate = {
 		executionOrder: 'v1',
 	},
 	pinData: {},
-};
-
-export const SAMPLE_EVALUATION_WORKFLOW: IWorkflowDataCreate = {
-	name: 'My Evaluation Sub-Workflow',
-	nodes: [
-		{
-			parameters: {
-				inputSource: 'passthrough',
-			},
-			id: 'c20c82d6-5f71-4fb6-a398-a10a6e6944c5',
-			name: 'When called by a test run',
-			type: 'n8n-nodes-base.executeWorkflowTrigger',
-			typeVersion: 1.1,
-			position: [80, 440],
-		},
-		{
-			parameters: {},
-			id: '4e14d09a-2699-4659-9a20-e4f4965f473e',
-			name: 'Replace me',
-			type: 'n8n-nodes-base.noOp',
-			typeVersion: 1,
-			position: [340, 440],
-		},
-		{
-			parameters: {
-				metrics: {
-					assignments: [
-						{
-							name: 'latency',
-							value:
-								'={{(() => {\n  const newExecutionRuns = Object.values($json.newExecution)\n    .reduce((acc, node) => {\n      acc.push(node.runs.filter(run => run.output.main !== undefined))\n      return acc\n    }, []).flat()\n\n  const latency = newExecutionRuns.reduce((acc, run) => acc + run.executionTime, 0)\n\n  return latency\n})()}}',
-							type: 'number',
-							id: '1ebc15e9-f079-4d1f-a08d-d4880ea0ddb5',
-						},
-					],
-				},
-			},
-			type: 'n8n-nodes-base.evaluationMetrics',
-			id: '33e2e94a-ec48-4e7b-b750-f56718d5105c',
-			name: 'Return metric(s)',
-			typeVersion: 1,
-			position: [600, 440],
-		},
-		{
-			parameters: {
-				content:
-					"### 1. Receive execution data\n\nThis workflow will be passed:\n- The benchmark execution (`$json.originalExecution`)\n- The evaluation execution (`$json.newExecution`) produced by re-running the workflow using trigger data from benchmark execution\n\n\nWe've pinned some example data to get you started",
-				height: 458,
-				width: 257,
-				color: 7,
-			},
-			id: '55e5e311-e285-4000-bd1e-900bc3a07da3',
-			name: 'Sticky Note',
-			type: 'n8n-nodes-base.stickyNote',
-			typeVersion: 1,
-			position: [0, 140],
-		},
-		{
-			parameters: {
-				content:
-					'### 2. Evaluation logic\n\nReplace with logic to perform the tests you want to perform.\n\nE.g. compare against benchmark data, use LLMs to evaluate sentiment, compare token usage, and more.',
-				height: 459,
-				width: 237,
-				color: 7,
-			},
-			id: 'ea74e341-ff9c-456a-83f0-c10758f0844a',
-			name: 'Sticky Note1',
-			type: 'n8n-nodes-base.stickyNote',
-			typeVersion: 1,
-			position: [280, 140],
-		},
-		{
-			parameters: {
-				content:
-					'### 3. Return metrics\n\nDefine evaluation metrics you want to show on your report.\n\n__Note:__ Metrics need to be numeric',
-				height: 459,
-				width: 217,
-				color: 7,
-			},
-			id: '9b3c3408-19e1-43d5-b2bb-29d61bd129b8',
-			name: 'Sticky Note2',
-			type: 'n8n-nodes-base.stickyNote',
-			typeVersion: 1,
-			position: [540, 140],
-		},
-		{
-			parameters: {
-				content:
-					'## Evaluation workflow\nThis workflow is used to define evaluation logic and calculate metrics. You can compare against benchmark executions, use LLMs to evaluate, or write any other logic you choose.',
-				height: 105,
-				width: 754,
-			},
-			id: '0fc1356e-6238-4557-a920-e50806c1ec13',
-			name: 'Sticky Note3',
-			type: 'n8n-nodes-base.stickyNote',
-			typeVersion: 1,
-			position: [0, 0],
-		},
-	],
-	connections: {
-		'When called by a test run': {
-			main: [
-				[
-					{
-						node: 'Replace me',
-						type: NodeConnectionTypes.Main,
-						index: 0,
-					},
-				],
-			],
-		},
-		'Replace me': {
-			main: [
-				[
-					{
-						node: 'Return metric(s)',
-						type: NodeConnectionTypes.Main,
-						index: 0,
-					},
-				],
-			],
-		},
-	},
-	pinData: {
-		'When called by a test run': [
-			{
-				json: {
-					newExecution: {},
-					originalExecution: {},
-				},
-			},
-		],
-	},
-	settings: {
-		executionOrder: 'v1',
-	},
 };

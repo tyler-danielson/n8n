@@ -10,9 +10,7 @@ import type {
 } from '@vue-flow/core';
 import type { IExecutionResponse, INodeUi } from '@/Interface';
 import type { ComputedRef, Ref } from 'vue';
-import type { EventBus } from '@n8n/utils/event-bus';
-import type { CanvasLayoutSource } from '@/composables/useCanvasLayout';
-import type { NodeIconSource } from '../utils/nodeIcon';
+import type { EventBus } from 'n8n-design-system';
 
 export const enum CanvasConnectionMode {
 	Input = 'inputs',
@@ -45,20 +43,9 @@ export const enum CanvasNodeRenderType {
 	Default = 'default',
 	StickyNote = 'n8n-nodes-base.stickyNote',
 	AddNodes = 'n8n-nodes-internal.addNodes',
-	AIPrompt = 'n8n-nodes-base.aiPrompt',
 }
 
 export type CanvasNodeDefaultRenderLabelSize = 'small' | 'medium' | 'large';
-
-export const CanvasNodeDirtiness = {
-	PARAMETERS_UPDATED: 'parameters-updated',
-	INCOMING_CONNECTIONS_UPDATED: 'incoming-connections-updated',
-	PINNED_DATA_UPDATED: 'pinned-data-updated',
-	UPSTREAM_DIRTY: 'upstream-dirty',
-} as const;
-
-export type CanvasNodeDirtinessType =
-	(typeof CanvasNodeDirtiness)[keyof typeof CanvasNodeDirtiness];
 
 export type CanvasNodeDefaultRender = {
 	type: CanvasNodeRenderType.Default;
@@ -73,18 +60,11 @@ export type CanvasNodeDefaultRender = {
 			labelSize: CanvasNodeDefaultRenderLabelSize;
 		};
 		tooltip?: string;
-		dirtiness?: CanvasNodeDirtinessType;
-		icon?: NodeIconSource;
 	}>;
 };
 
 export type CanvasNodeAddNodesRender = {
 	type: CanvasNodeRenderType.AddNodes;
-	options: Record<string, never>;
-};
-
-export type CanvasNodeAIPromptRender = {
-	type: CanvasNodeRenderType.AIPrompt;
 	options: Record<string, never>;
 };
 
@@ -129,11 +109,7 @@ export interface CanvasNodeData {
 		iterations: number;
 		visible: boolean;
 	};
-	render:
-		| CanvasNodeDefaultRender
-		| CanvasNodeStickyNoteRender
-		| CanvasNodeAddNodesRender
-		| CanvasNodeAIPromptRender;
+	render: CanvasNodeDefaultRender | CanvasNodeStickyNoteRender | CanvasNodeAddNodesRender;
 }
 
 export type CanvasNode = Node<CanvasNodeData>;
@@ -167,21 +143,19 @@ export interface CanvasInjectionData {
 
 export type CanvasNodeEventBusEvents = {
 	'update:sticky:color': never;
-	'update:node:activated': never;
-	'update:node:class': { className: string; add?: boolean };
+	'update:node:active': never;
 };
 
 export type CanvasEventBusEvents = {
 	fitView: never;
 	'saved:workflow': never;
 	'open:execution': IExecutionResponse;
-	'nodes:select': { ids: string[]; panIntoView?: boolean };
+	'nodes:select': { ids: string[] };
 	'nodes:action': {
 		ids: string[];
 		action: keyof CanvasNodeEventBusEvents;
 		payload?: CanvasNodeEventBusEvents[keyof CanvasNodeEventBusEvents];
 	};
-	tidyUp: { source: CanvasLayoutSource };
 };
 
 export interface CanvasNodeInjectionData {
@@ -228,11 +202,4 @@ export type BoundingBox = {
 	y: number;
 	width: number;
 	height: number;
-};
-
-export type ViewportBoundaries = {
-	xMin: number;
-	xMax: number;
-	yMin: number;
-	yMax: number;
 };

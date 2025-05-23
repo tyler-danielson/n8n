@@ -136,13 +136,14 @@ function onGroupSelect(group: string) {
 	align-items: center;
 	justify-content: space-between;
 	font-size: var(--font-size-s);
+	font-weight: var(--font-weight-bold);
 	line-height: var(--font-line-height-regular);
 	color: var(--color-text-dark);
 	padding: var(--spacing-2xs) var(--spacing-s);
 	cursor: pointer;
 
 	&.suggested {
-		font-weight: var(--font-weight-bold);
+		font-weight: 800;
 	}
 
 	&:hover {

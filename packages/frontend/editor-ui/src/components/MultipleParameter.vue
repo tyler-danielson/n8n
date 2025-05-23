@@ -8,7 +8,7 @@ import { useI18n } from '@/composables/useI18n';
 import type { IUpdateInformation } from '@/Interface';
 import CollectionParameter from '@/components/CollectionParameter.vue';
 import ParameterInputFull from '@/components/ParameterInputFull.vue';
-import { N8nButton, N8nInputLabel, N8nText } from '@n8n/design-system';
+import { N8nButton, N8nInputLabel, N8nText } from 'n8n-design-system';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 
 defineOptions({ name: 'MultipleParameter' });

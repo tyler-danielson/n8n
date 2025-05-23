@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { EventBus } from '@n8n/utils/event-bus';
+import type { EventBus } from 'n8n-design-system';
 import { onBeforeUnmount, onMounted, ref } from 'vue';
 import ExpandableInputBase from './ExpandableInputBase.vue';
 import { onClickOutside } from '@vueuse/core';
@@ -37,7 +37,6 @@ onBeforeUnmount(() => {
 function focus() {
 	if (inputRef.value) {
 		inputRef.value.focus();
-		inputRef.value.select();
 	}
 }
 
@@ -68,7 +67,7 @@ function onEscape() {
 	<ExpandableInputBase :model-value="modelValue" :placeholder="placeholder">
 		<input
 			ref="inputRef"
-			:class="['el-input__inner', $style.input]"
+			class="el-input__inner"
 			:value="modelValue"
 			:placeholder="placeholder"
 			:maxlength="maxlength"
@@ -79,10 +78,3 @@ function onEscape() {
 		/>
 	</ExpandableInputBase>
 </template>
-
-<style module lang="scss">
-.input {
-	padding: var(--spacing-4xs);
-	font-size: var(--font-size-s);
-}
-</style>

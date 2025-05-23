@@ -3,7 +3,7 @@ import { ElTable } from 'element-plus';
 import { MAX_TAG_NAME_LENGTH } from '@/constants';
 import type { ITagRow } from '@/Interface';
 import { onMounted, ref, watch } from 'vue';
-import { N8nInput } from '@n8n/design-system';
+import { N8nInput } from 'n8n-design-system';
 import type { BaseTextKey } from '@/plugins/i18n';
 import { useI18n } from '@/composables/useI18n';
 

@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { computed, watch, onBeforeMount } from 'vue';
+import { ref, computed, watch, onBeforeMount } from 'vue';
 import { EnterpriseEditionFeature } from '@/constants';
 import { useProjectsStore } from '@/stores/projects.store';
 import type { ProjectSharingData } from '@/types/projects.types';
 import ProjectSharing from '@/components/Projects/ProjectSharing.vue';
-import type { BaseFilters } from '../layouts/ResourcesListLayout.vue';
+import type { IFilters } from '../layouts/ResourcesListLayout.vue';
 import { useI18n } from '@/composables/useI18n';
 
 type IResourceFiltersType = Record<string, boolean | string | string[]>;
@@ -15,36 +15,25 @@ const props = withDefaults(
 		keys?: string[];
 		shareable?: boolean;
 		reset?: () => void;
-		justIcon?: boolean;
 	}>(),
 	{
 		modelValue: () => ({}),
 		keys: () => [],
 		shareable: true,
 		reset: () => {},
-		justIcon: false,
 	},
 );
 
 const emit = defineEmits<{
-	'update:modelValue': [value: BaseFilters];
+	'update:modelValue': [value: IFilters];
 	'update:filtersLength': [value: number];
 }>();
+
+const selectedProject = ref<ProjectSharingData | null>(null);
 
 const projectsStore = useProjectsStore();
 
 const i18n = useI18n();
-
-const selectedProject = computed<ProjectSharingData | null>({
-	get: () => {
-		return (
-			projectsStore.availableProjects.find(
-				(project) => project.id === props.modelValue.homeProject,
-			) ?? null
-		);
-	},
-	set: (value) => setKeyValue('homeProject', value?.id ?? ''),
-});
 
 const filtersLength = computed(() => {
 	let length = 0;
@@ -55,18 +44,7 @@ const filtersLength = computed(() => {
 		}
 
 		const value = props.modelValue[key];
-
-		if (value === true) {
-			length += 1;
-		}
-
-		if (Array.isArray(value) && value.length) {
-			length += 1;
-		}
-
-		if (typeof value === 'string' && value !== '') {
-			length += 1;
-		}
+		length += (Array.isArray(value) ? value.length > 0 : value !== '') ? 1 : 0;
 	});
 
 	return length;
@@ -78,7 +56,7 @@ const setKeyValue = (key: string, value: unknown) => {
 	const filters = {
 		...props.modelValue,
 		[key]: value,
-	} as BaseFilters;
+	} as IFilters;
 
 	emit('update:modelValue', filters);
 };
@@ -87,7 +65,7 @@ const resetFilters = () => {
 	if (props.reset) {
 		props.reset();
 	} else {
-		const filters = { ...props.modelValue } as BaseFilters;
+		const filters = { ...props.modelValue } as IFilters;
 
 		props.keys.forEach((key) => {
 			filters[key] = Array.isArray(props.modelValue[key]) ? [] : '';
@@ -104,6 +82,10 @@ watch(filtersLength, (value) => {
 
 onBeforeMount(async () => {
 	await projectsStore.getAvailableProjects();
+	selectedProject.value =
+		projectsStore.availableProjects.find(
+			(project) => project.id === props.modelValue.homeProject,
+		) ?? null;
 });
 </script>
 
@@ -113,25 +95,14 @@ onBeforeMount(async () => {
 			<n8n-button
 				icon="filter"
 				type="tertiary"
-				size="small"
 				:active="hasFilters"
-				:class="{
-					[$style['filter-button']]: true,
-					[$style['no-label']]: justIcon && filtersLength === 0,
-				}"
+				:class="$style['filter-button']"
 				data-test-id="resources-list-filters-trigger"
 			>
-				<n8n-badge
-					v-if="filtersLength > 0"
-					:class="$style['filter-button-count']"
-					data-test-id="resources-list-filters-count"
-					theme="primary"
-				>
+				<n8n-badge v-show="filtersLength > 0" theme="primary" class="mr-4xs">
 					{{ filtersLength }}
 				</n8n-badge>
-				<span v-if="!justIcon" :class="$style['filter-button-text']">
-					{{ i18n.baseText('forms.resourceFiltersDropdown.filters') }}
-				</span>
+				{{ i18n.baseText('forms.resourceFiltersDropdown.filters') }}
 			</n8n-button>
 		</template>
 		<div :class="$style['filters-dropdown']" data-test-id="resources-list-filters-dropdown">
@@ -166,34 +137,8 @@ onBeforeMount(async () => {
 
 <style lang="scss" module>
 .filter-button {
-	height: 30px;
+	height: 40px;
 	align-items: center;
-
-	&.no-label {
-		width: 30px;
-		span + span {
-			margin: 0;
-		}
-	}
-
-	.filter-button-count {
-		margin-right: var(--spacing-4xs);
-
-		@include mixins.breakpoint('xs-only') {
-			margin-right: 0;
-		}
-	}
-
-	@media screen and (max-width: 480px) {
-		.filter-button-text {
-			text-indent: -10000px;
-		}
-
-		// Remove icon margin when the "Filters" text is hidden
-		:global(span + span) {
-			margin: 0;
-		}
-	}
 }
 
 .filters-dropdown {

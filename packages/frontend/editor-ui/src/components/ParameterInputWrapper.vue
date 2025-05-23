@@ -9,16 +9,20 @@ import {
 	type INodePropertyMode,
 	type IParameterLabel,
 	type NodeParameterValueType,
+	type Result,
 } from 'n8n-workflow';
 
-import { useResolvedExpression } from '@/composables/useResolvedExpression';
+import { useWorkflowHelpers } from '@/composables/useWorkflowHelpers';
 import useEnvironmentsStore from '@/stores/environments.ee.store';
 import { useExternalSecretsStore } from '@/stores/externalSecrets.ee.store';
 import { useNDVStore } from '@/stores/ndv.store';
+import { stringifyExpressionResult } from '@/utils/expressions';
 import { isValueExpression, parseResourceMapperFieldName } from '@/utils/nodeTypesUtils';
-import type { EventBus } from '@n8n/utils/event-bus';
-import { createEventBus } from '@n8n/utils/event-bus';
-import { computed, useTemplateRef } from 'vue';
+import type { EventBus } from 'n8n-design-system/utils';
+import { createEventBus } from 'n8n-design-system/utils';
+import { computed } from 'vue';
+import { useRouter } from 'vue-router';
+import { useWorkflowsStore } from '@/stores/workflows.store';
 
 type Props = {
 	parameter: INodeProperties;
@@ -41,7 +45,6 @@ type Props = {
 	eventSource?: string;
 	label?: IParameterLabel;
 	eventBus?: EventBus;
-	canBeOverridden?: boolean;
 };
 
 const props = withDefaults(defineProps<Props>(), {
@@ -59,6 +62,9 @@ const emit = defineEmits<{
 	textInput: [value: IUpdateInformation];
 }>();
 
+const router = useRouter();
+const workflowHelpers = useWorkflowHelpers({ router });
+
 const ndvStore = useNDVStore();
 const externalSecretsStore = useExternalSecretsStore();
 const environmentsStore = useEnvironmentsStore();
@@ -66,6 +72,8 @@ const environmentsStore = useEnvironmentsStore();
 const isExpression = computed(() => {
 	return isValueExpression(props.parameter, props.modelValue);
 });
+
+const activeNode = computed(() => ndvStore.activeNode);
 
 const selectedRLMode = computed(() => {
 	if (
@@ -99,9 +107,57 @@ const targetItem = computed(() => ndvStore.expressionTargetItem);
 
 const isInputParentOfActiveNode = computed(() => ndvStore.isInputParentOfActiveNode);
 
-const expression = computed(() => {
-	if (!isExpression.value) return '';
-	return isResourceLocatorValue(props.modelValue) ? props.modelValue.value : props.modelValue;
+const evaluatedExpression = computed<Result<unknown, Error>>(() => {
+	const value = isResourceLocatorValue(props.modelValue)
+		? props.modelValue.value
+		: props.modelValue;
+
+	if (!activeNode.value || !isExpression.value || typeof value !== 'string') {
+		return { ok: false, error: new Error() };
+	}
+
+	try {
+		let opts: Parameters<typeof workflowHelpers.resolveExpression>[2] = {
+			isForCredential: props.isForCredential,
+		};
+		if (ndvStore.isInputParentOfActiveNode) {
+			opts = {
+				...opts,
+				targetItem: targetItem.value ?? undefined,
+				inputNodeName: ndvStore.ndvInputNodeName,
+				inputRunIndex: ndvStore.ndvInputRunIndex,
+				inputBranchIndex: ndvStore.ndvInputBranchIndex,
+				additionalKeys: resolvedAdditionalExpressionData.value,
+			};
+		}
+
+		if (props.isForCredential) opts.additionalKeys = resolvedAdditionalExpressionData.value;
+
+		return { ok: true, result: workflowHelpers.resolveExpression(value, undefined, opts) };
+	} catch (error) {
+		return { ok: false, error };
+	}
+});
+
+const evaluatedExpressionValue = computed(() => {
+	const evaluated = evaluatedExpression.value;
+	return evaluated.ok ? evaluated.result : null;
+});
+
+const evaluatedExpressionString = computed(() => {
+	const hasRunData =
+		!!useWorkflowsStore().workflowExecutionData?.data?.resultData?.runData[
+			ndvStore.activeNode?.name ?? ''
+		];
+	return stringifyExpressionResult(evaluatedExpression.value, hasRunData);
+});
+
+const expressionOutput = computed(() => {
+	if (isExpression.value && evaluatedExpressionString.value) {
+		return evaluatedExpressionString.value;
+	}
+
+	return null;
 });
 
 const resolvedAdditionalExpressionData = computed(() => {
@@ -112,13 +168,6 @@ const resolvedAdditionalExpressionData = computed(() => {
 			: {}),
 		...props.additionalExpressionData,
 	};
-});
-
-const { resolvedExpression, resolvedExpressionString } = useResolvedExpression({
-	expression,
-	additionalData: resolvedAdditionalExpressionData,
-	isForCredential: props.isForCredential,
-	stringifyObject: props.parameter.type !== 'multiOptions',
 });
 
 const parsedParameterName = computed(() => {
@@ -144,16 +193,6 @@ function onValueChanged(parameterData: IUpdateInformation) {
 function onTextInput(parameterData: IUpdateInformation) {
 	emit('textInput', parameterData);
 }
-
-const param = useTemplateRef('param');
-const isSingleLineInput = computed(() => param.value?.isSingleLineInput);
-const displaysIssues = computed(() => param.value?.displaysIssues);
-defineExpose({
-	isSingleLineInput,
-	displaysIssues,
-	focusInput: () => param.value?.focusInput(),
-	selectInput: () => param.value?.selectInput(),
-});
 </script>
 
 <template>
@@ -174,31 +213,26 @@ defineExpose({
 			:error-highlight="errorHighlight"
 			:is-for-credential="isForCredential"
 			:event-source="eventSource"
-			:expression-evaluated="resolvedExpression"
+			:expression-evaluated="evaluatedExpressionValue"
 			:additional-expression-data="resolvedAdditionalExpressionData"
 			:label="label"
 			:rows="rows"
 			:data-test-id="`parameter-input-${parsedParameterName}`"
 			:event-bus="eventBus"
-			:can-be-overridden="canBeOverridden"
 			@focus="onFocus"
 			@blur="onBlur"
 			@drop="onDrop"
 			@text-input="onTextInput"
 			@update="onValueChanged"
-		>
-			<template #overrideButton>
-				<slot v-if="$slots.overrideButton" name="overrideButton" />
-			</template>
-		</ParameterInput>
-		<div v-if="!hideHint && (resolvedExpressionString || parameterHint)" :class="$style.hint">
+		/>
+		<div v-if="!hideHint && (expressionOutput || parameterHint)" :class="$style.hint">
 			<div>
 				<InputHint
-					v-if="resolvedExpressionString"
+					v-if="expressionOutput"
 					:class="{ [$style.hint]: true, 'ph-no-capture': isForCredential }"
 					:data-test-id="`parameter-expression-preview-${parsedParameterName}`"
-					:highlight="!!(resolvedExpressionString && targetItem) && isInputParentOfActiveNode"
-					:hint="resolvedExpressionString"
+					:highlight="!!(expressionOutput && targetItem) && isInputParentOfActiveNode"
+					:hint="expressionOutput"
 					:single-line="true"
 				/>
 				<InputHint v-else-if="parameterHint" :render-h-t-m-l="true" :hint="parameterHint" />

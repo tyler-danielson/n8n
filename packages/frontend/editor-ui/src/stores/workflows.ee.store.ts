@@ -1,7 +1,6 @@
 import * as workflowsApi from '@/api/workflows.ee';
-import { EnterpriseEditionFeature } from '@/constants';
-import { STORES } from '@n8n/stores';
-import { useRootStore } from '@n8n/stores/useRootStore';
+import { EnterpriseEditionFeature, STORES } from '@/constants';
+import { useRootStore } from '@/stores/root.store';
 import { useSettingsStore } from '@/stores/settings.store';
 import { defineStore } from 'pinia';
 import { useWorkflowsStore } from '@/stores/workflows.store';

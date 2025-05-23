@@ -1,8 +1,9 @@
 <script lang="ts" setup>
 import { computed, onBeforeUnmount, watch } from 'vue';
 import { useI18n } from '@/composables/useI18n';
-import { SETUP_CREDENTIALS_MODAL_KEY } from '@/constants';
+import { SETUP_CREDENTIALS_MODAL_KEY, TEMPLATE_CREDENTIAL_SETUP_EXPERIMENT } from '@/constants';
 import { useNodeTypesStore } from '@/stores/nodeTypes.store';
+import { usePostHog } from '@/stores/posthog.store';
 import { useUIStore } from '@/stores/ui.store';
 import { useWorkflowsStore } from '@/stores/workflows.store';
 import { doesNodeHaveAllCredentialsFilled } from '@/utils/nodes/nodeTransforms';
@@ -10,6 +11,7 @@ import { doesNodeHaveAllCredentialsFilled } from '@/utils/nodes/nodeTransforms';
 const workflowsStore = useWorkflowsStore();
 const nodeTypesStore = useNodeTypesStore();
 const uiStore = useUIStore();
+const posthogStore = usePostHog();
 const i18n = useI18n();
 
 const isTemplateSetupCompleted = computed(() => {
@@ -23,15 +25,16 @@ const allCredentialsFilled = computed(() => {
 
 	const nodes = workflowsStore.getNodes();
 	if (!nodes.length) {
-		return true;
+		return false;
 	}
 
 	return nodes.every((node) => doesNodeHaveAllCredentialsFilled(nodeTypesStore, node));
 });
 
 const showButton = computed(() => {
+	const isFeatureEnabled = posthogStore.isFeatureEnabled(TEMPLATE_CREDENTIAL_SETUP_EXPERIMENT);
 	const isCreatedFromTemplate = !!workflowsStore.workflow?.meta?.templateId;
-	if (!isCreatedFromTemplate || isTemplateSetupCompleted.value) {
+	if (!isFeatureEnabled || !isCreatedFromTemplate || isTemplateSetupCompleted.value) {
 		return false;
 	}
 
@@ -61,7 +64,6 @@ onBeforeUnmount(() => {
 	<n8n-button
 		v-if="showButton"
 		:label="i18n.baseText('nodeView.setupTemplate')"
-		data-test-id="setup-credentials-button"
 		size="large"
 		icon="box-open"
 		type="secondary"

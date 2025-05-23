@@ -13,12 +13,12 @@ import { useSettingsStore } from '@/stores/settings.store';
 import { defaultSettings } from '../__tests__/defaults';
 import { merge } from 'lodash-es';
 import { DEFAULT_POSTHOG_SETTINGS } from './posthog.test';
-import { VIEWS } from '@/constants';
+import { AI_ASSISTANT_EXPERIMENT, VIEWS } from '@/constants';
 import { reactive } from 'vue';
 import * as chatAPI from '@/api/ai';
 import * as telemetryModule from '@/composables/useTelemetry';
 import type { Telemetry } from '@/plugins/telemetry';
-import type { ChatUI } from '@n8n/design-system/types/assistant';
+import type { ChatUI } from 'n8n-design-system/types/assistant';
 
 let settingsStore: ReturnType<typeof useSettingsStore>;
 let posthogStore: ReturnType<typeof usePostHog>;
@@ -54,6 +54,12 @@ vi.mock('vue-router', () => ({
 	useRouter: vi.fn(),
 	RouterLink: vi.fn(),
 }));
+
+const mockPostHogVariant = (variant: 'variant' | 'control') => {
+	posthogStore.overrides = {
+		[AI_ASSISTANT_EXPERIMENT.name]: variant,
+	};
+};
 
 describe('AI Assistant store', () => {
 	beforeEach(() => {
@@ -275,9 +281,20 @@ describe('AI Assistant store', () => {
 		expect(assistantStore.currentSessionId).toBeUndefined();
 	});
 
+	it('should not show assistant for control experiment group', () => {
+		const assistantStore = useAssistantStore();
+
+		mockPostHogVariant('control');
+		setAssistantEnabled(true);
+		expect(assistantStore.isAssistantEnabled).toBe(false);
+		expect(assistantStore.canShowAssistant).toBe(false);
+		expect(assistantStore.canShowAssistantButtonsOnCanvas).toBe(false);
+	});
+
 	it('should not show assistant if disabled in settings', () => {
 		const assistantStore = useAssistantStore();
 
+		mockPostHogVariant('variant');
 		setAssistantEnabled(false);
 		expect(assistantStore.isAssistantEnabled).toBe(false);
 		expect(assistantStore.canShowAssistant).toBe(false);
@@ -288,6 +305,7 @@ describe('AI Assistant store', () => {
 		const assistantStore = useAssistantStore();
 
 		setAssistantEnabled(true);
+		mockPostHogVariant('variant');
 		expect(assistantStore.isAssistantEnabled).toBe(true);
 		expect(assistantStore.canShowAssistant).toBe(true);
 		expect(assistantStore.canShowAssistantButtonsOnCanvas).toBe(true);
@@ -298,6 +316,7 @@ describe('AI Assistant store', () => {
 		const assistantStore = useAssistantStore();
 
 		setAssistantEnabled(true);
+		mockPostHogVariant('variant');
 		expect(assistantStore.isAssistantEnabled).toBe(true);
 		expect(assistantStore.canShowAssistant).toBe(false);
 		expect(assistantStore.canShowAssistantButtonsOnCanvas).toBe(false);
@@ -309,6 +328,7 @@ describe('AI Assistant store', () => {
 			const assistantStore = useAssistantStore();
 
 			setAssistantEnabled(true);
+			mockPostHogVariant('variant');
 			expect(assistantStore.isAssistantEnabled).toBe(true);
 			expect(assistantStore.canShowAssistant).toBe(true);
 			expect(assistantStore.canShowAssistantButtonsOnCanvas).toBe(false);

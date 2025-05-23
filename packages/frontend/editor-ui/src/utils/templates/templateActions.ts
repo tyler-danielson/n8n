@@ -5,10 +5,11 @@ import type {
 	IWorkflowTemplate,
 } from '@/Interface';
 import { getNewWorkflow } from '@/api/workflows';
-import { VIEWS } from '@/constants';
-import type { useRootStore } from '@n8n/stores/useRootStore';
+import { TEMPLATE_CREDENTIAL_SETUP_EXPERIMENT, VIEWS } from '@/constants';
+import type { useRootStore } from '@/stores/root.store';
+import type { PosthogStore } from '@/stores/posthog.store';
 import type { useWorkflowsStore } from '@/stores/workflows.store';
-import { getNodesWithNormalizedPosition } from '@/utils/nodeViewUtils';
+import { getFixedNodesList } from '@/utils/nodeViewUtils';
 import type { NodeTypeProvider } from '@/utils/nodeTypes/nodeTypeTransforms';
 import type { TemplateCredentialKey } from '@/utils/templates/templateTransforms';
 import { replaceAllTemplateNodeCredentials } from '@/utils/templates/templateTransforms';
@@ -18,7 +19,7 @@ import type { TemplatesStore } from '@/stores/templates.store';
 import type { NodeTypesStore } from '@/stores/nodeTypes.store';
 import type { Telemetry } from '@/plugins/telemetry';
 import type { useExternalHooks } from '@/composables/useExternalHooks';
-import { assert } from '@n8n/utils/assert';
+import { assert } from '@/utils/assert';
 import { doesNodeHaveCredentialsToFill } from '@/utils/nodes/nodeTransforms';
 import { tryToParseNumber } from '@/utils/typesUtils';
 
@@ -42,7 +43,7 @@ export async function createWorkflowFromTemplate(opts: {
 		template.workflow.nodes,
 		credentialOverrides,
 	);
-	const nodes = getNodesWithNormalizedPosition(nodesWithCreds) as INodeUi[];
+	const nodes = getFixedNodesList(nodesWithCreds) as INodeUi[];
 	const connections = template.workflow.connections;
 
 	const workflowToCreate: IWorkflowData = {
@@ -146,6 +147,7 @@ async function getFullTemplate(templatesStore: TemplatesStore, templateId: strin
 export async function useTemplateWorkflow(opts: {
 	externalHooks: ExternalHooks;
 	nodeTypesStore: NodeTypesStore;
+	posthogStore: PosthogStore;
 	templateId: string;
 	templatesStore: TemplatesStore;
 	router: Router;
@@ -153,7 +155,13 @@ export async function useTemplateWorkflow(opts: {
 	telemetry: Telemetry;
 	source: string;
 }) {
-	const { nodeTypesStore, templateId, templatesStore } = opts;
+	const { nodeTypesStore, posthogStore, templateId, templatesStore } = opts;
+
+	const openCredentialSetup = posthogStore.isFeatureEnabled(TEMPLATE_CREDENTIAL_SETUP_EXPERIMENT);
+	if (!openCredentialSetup) {
+		await openTemplateWorkflowOnNodeView(opts);
+		return;
+	}
 
 	const [template] = await Promise.all([
 		getFullTemplate(templatesStore, templateId),

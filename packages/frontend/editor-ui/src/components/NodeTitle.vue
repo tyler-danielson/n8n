@@ -90,7 +90,7 @@ function onRename() {
 
 <style lang="scss" module>
 .container {
-	font-weight: var(--font-weight-medium);
+	font-weight: var(--font-weight-bold);
 	display: flex;
 	font-size: var(--font-size-m);
 	line-height: var(--font-line-height-compact);

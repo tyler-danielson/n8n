@@ -8,12 +8,12 @@ import { getPairedItemId } from '@/utils/pairedItemUtils';
 import { shorten } from '@/utils/typesUtils';
 import type { GenericValue, IDataObject, INodeExecutionData } from 'n8n-workflow';
 import { computed, onMounted, ref, watch } from 'vue';
-import Draggable from '@/components/Draggable.vue';
+import Draggable from './Draggable.vue';
 import MappingPill from './MappingPill.vue';
 import TextWithHighlights from './TextWithHighlights.vue';
 import { useI18n } from '@/composables/useI18n';
 import { useTelemetry } from '@/composables/useTelemetry';
-import { N8nIconButton, N8nInfoTip, N8nTooltip, N8nTree } from '@n8n/design-system';
+import { N8nIconButton, N8nInfoTip, N8nTooltip, N8nTree } from 'n8n-design-system';
 import { storeToRefs } from 'pinia';
 import { useExecutionHelpers } from '@/composables/useExecutionHelpers';
 
@@ -32,9 +32,6 @@ type Props = {
 	mappingEnabled?: boolean;
 	hasDefaultHoverState?: boolean;
 	search?: string;
-	headerBgColor?: 'base' | 'light';
-	compact?: boolean;
-	disableHoverHighlight?: boolean;
 };
 
 const props = withDefaults(defineProps<Props>(), {
@@ -44,9 +41,6 @@ const props = withDefaults(defineProps<Props>(), {
 	mappingEnabled: false,
 	hasDefaultHoverState: false,
 	search: '',
-	headerBgColor: 'base',
-	disableHoverHighlight: false,
-	compact: false,
 });
 const emit = defineEmits<{
 	activeRowChanged: [row: number | null];
@@ -77,9 +71,6 @@ const {
 	focusedMappableInput,
 	highlightDraggables: highlight,
 } = storeToRefs(ndvStore);
-
-const canDraggableDrop = computed(() => ndvStore.canDraggableDrop);
-const draggableStickyPosition = computed(() => ndvStore.draggableStickyPos);
 const pairedItemMappings = computed(() => workflowsStore.workflowExecutionPairedItemMappings);
 const tableData = computed(() => convertToTable(props.inputData));
 
@@ -95,10 +86,6 @@ onMounted(() => {
 });
 
 function isHoveringRow(row: number): boolean {
-	if (props.disableHoverHighlight) {
-		return false;
-	}
-
 	if (row === activeRow.value) {
 		return true;
 	}
@@ -257,22 +244,17 @@ function getValueToRender(value: unknown): string {
 	return JSON.stringify(value);
 }
 
-function onDragStart(el: HTMLElement, data?: string) {
+function onDragStart() {
 	draggedColumn.value = true;
-	ndvStore.draggableStartDragging({
-		type: 'mapping',
-		data: data ?? '',
-		dimensions: el?.getBoundingClientRect() ?? null,
-	});
 	ndvStore.resetMappingTelemetry();
 }
 
-function onCellDragStart(el: HTMLElement, data?: string) {
+function onCellDragStart(el: HTMLElement) {
 	if (el?.dataset.value) {
 		draggingPath.value = el.dataset.value;
 	}
 
-	onDragStart(el, data);
+	onDragStart();
 }
 
 function onCellDragEnd(el: HTMLElement) {
@@ -290,7 +272,6 @@ function isDraggingKey(path: Array<string | number>, colIndex: number) {
 }
 
 function onDragEnd(column: string, src: string, depth = '0') {
-	ndvStore.draggableStopDragging();
 	setTimeout(() => {
 		const mappingTelemetry = ndvStore.mappingTelemetry;
 		const telemetryPayload = {
@@ -432,16 +413,7 @@ watch(focusedMappableInput, (curr) => {
 </script>
 
 <template>
-	<div
-		:class="[
-			$style.dataDisplay,
-			{
-				[$style.highlight]: highlight,
-				[$style.lightHeader]: headerBgColor === 'light',
-				[$style.compact]: props.compact,
-			},
-		]"
-	>
+	<div :class="[$style.dataDisplay, { [$style.highlight]: highlight }]">
 		<table v-if="tableData.columns && tableData.columns.length === 0" :class="$style.table">
 			<thead>
 				<tr>
@@ -467,7 +439,7 @@ watch(focusedMappableInput, (curr) => {
 					>
 						<N8nTooltip
 							:content="
-								i18n.baseText('runData.table.viewSubExecution', {
+								i18n.baseText('runData.table.inspectSubExecution', {
 									interpolate: {
 										id: `${tableData.metadata.data[index1]?.subExecution.executionId}`,
 									},
@@ -479,13 +451,12 @@ watch(focusedMappableInput, (curr) => {
 							<N8nIconButton
 								v-if="tableData.metadata.data[index1]"
 								v-show="showExecutionLink(index1)"
-								element="a"
 								type="secondary"
 								icon="external-link-alt"
 								data-test-id="debug-sub-execution"
 								size="mini"
-								target="_blank"
 								:href="resolveRelatedExecutionUrl(tableData.metadata.data[index1])"
+								target="_blank"
 								@click="trackOpeningRelatedExecution(tableData.metadata.data[index1], 'table')"
 							/>
 						</N8nTooltip>
@@ -520,8 +491,6 @@ watch(focusedMappableInput, (curr) => {
 								type="mapping"
 								:data="getExpression(column)"
 								:disabled="!mappingEnabled"
-								:can-drop="canDraggableDrop"
-								:sticky-position="draggableStickyPosition"
 								@dragstart="onDragStart"
 								@dragend="(column) => onDragEnd(column?.textContent ?? '', 'column')"
 							>
@@ -606,7 +575,7 @@ watch(focusedMappableInput, (curr) => {
 					>
 						<N8nTooltip
 							:content="
-								i18n.baseText('runData.table.viewSubExecution', {
+								i18n.baseText('runData.table.inspectSubExecution', {
 									interpolate: {
 										id: `${tableData.metadata.data[index1]?.subExecution.executionId}`,
 									},
@@ -615,18 +584,20 @@ watch(focusedMappableInput, (curr) => {
 							placement="left"
 							:hide-after="0"
 						>
-							<N8nIconButton
+							<a
 								v-if="tableData.metadata.data[index1]"
 								v-show="showExecutionLink(index1)"
-								element="a"
-								type="secondary"
-								icon="external-link-alt"
-								data-test-id="debug-sub-execution"
-								size="mini"
-								target="_blank"
 								:href="resolveRelatedExecutionUrl(tableData.metadata.data[index1])"
+								target="_blank"
 								@click="trackOpeningRelatedExecution(tableData.metadata.data[index1], 'table')"
-							/>
+							>
+								<N8nIconButton
+									type="secondary"
+									icon="external-link-alt"
+									data-test-id="debug-sub-execution"
+									size="mini"
+								/>
+							</a>
 						</N8nTooltip>
 					</td>
 					<td
@@ -646,22 +617,21 @@ watch(focusedMappableInput, (curr) => {
 						/>
 						<N8nTree v-else-if="isObject(data)" :node-class="$style.nodeClass" :value="data">
 							<template #label="{ label, path }">
-								<TextWithHighlights
-									data-target="mappable"
+								<span
 									:class="{
 										[$style.hoveringKey]: mappingEnabled && isHovering(path, index2),
 										[$style.draggingKey]: isDraggingKey(path, index2),
 										[$style.dataKey]: true,
 										[$style.mappable]: mappingEnabled,
 									}"
-									:content="label || i18n.baseText('runData.unnamedField')"
-									:search="search"
+									data-target="mappable"
 									:data-name="getCellPathName(path, index2)"
 									:data-value="getCellExpression(path, index2)"
 									:data-depth="path.length"
 									@mouseenter="() => onMouseEnterKey(path, index2)"
 									@mouseleave="onMouseLeaveKey"
-								/>
+									>{{ label || i18n.baseText('runData.unnamedField') }}</span
+								>
 							</template>
 
 							<template #value="{ value }">
@@ -693,18 +663,13 @@ watch(focusedMappableInput, (curr) => {
 	word-break: normal;
 	height: 100%;
 	padding-bottom: var(--spacing-3xl);
-
-	&.compact {
-		padding-left: var(--spacing-2xs);
-	}
 }
 
 .table {
 	border-collapse: separate;
 	text-align: left;
 	width: calc(100%);
-	font-size: var(--font-size-2xs);
-	color: var(--color-text-base);
+	font-size: var(--font-size-s);
 
 	th {
 		background-color: var(--color-background-base);
@@ -715,19 +680,11 @@ watch(focusedMappableInput, (curr) => {
 		top: 0;
 		color: var(--color-text-dark);
 		z-index: 1;
-
-		.lightHeader & {
-			background-color: var(--color-background-light);
-		}
-
-		&.tableRightMargin {
-			background-color: transparent;
-		}
 	}
 
 	td {
 		vertical-align: top;
-		padding: var(--spacing-4xs) var(--spacing-3xs);
+		padding: var(--spacing-2xs) var(--spacing-2xs) var(--spacing-2xs) var(--spacing-3xs);
 		border-bottom: var(--border-base);
 		border-left: var(--border-base);
 		overflow-wrap: break-word;
@@ -775,7 +732,7 @@ watch(focusedMappableInput, (curr) => {
 .header {
 	display: flex;
 	align-items: center;
-	padding: var(--spacing-4xs) var(--spacing-3xs);
+	padding: var(--spacing-2xs);
 
 	span {
 		white-space: nowrap;
@@ -860,16 +817,11 @@ watch(focusedMappableInput, (curr) => {
 
 .tableRightMargin {
 	// becomes necessary with large tables
+	background-color: var(--color-background-base) !important;
 	width: var(--spacing-s);
 	border-right: none !important;
 	border-top: none !important;
 	border-bottom: none !important;
-
-	.compact & {
-		padding: 0;
-		min-width: var(--spacing-2xs);
-		max-width: var(--spacing-2xs);
-	}
 }
 
 .hoveringRow {

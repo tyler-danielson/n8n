@@ -18,12 +18,11 @@ import type {
 	INodeParameterResourceLocator,
 	INodeParameters,
 	INodeProperties,
-	INodePropertyCollection,
 	INodePropertyOptions,
 	IParameterLabel,
 	NodeParameterValueType,
 } from 'n8n-workflow';
-import { CREDENTIAL_EMPTY_VALUE, isResourceLocatorValue, NodeHelpers } from 'n8n-workflow';
+import { CREDENTIAL_EMPTY_VALUE, NodeHelpers } from 'n8n-workflow';
 
 import CodeNodeEditor from '@/components/CodeNodeEditor/CodeNodeEditor.vue';
 import CredentialsSelect from '@/components/CredentialsSelect.vue';
@@ -38,6 +37,7 @@ import SqlEditor from '@/components/SqlEditor/SqlEditor.vue';
 import TextEdit from '@/components/TextEdit.vue';
 
 import { hasExpressionMapping, isValueExpression } from '@/utils/nodeTypesUtils';
+import { isResourceLocatorValue } from '@/utils/typeGuards';
 
 import {
 	AI_TRANSFORM_NODE_TYPE,
@@ -61,15 +61,10 @@ import { useNodeTypesStore } from '@/stores/nodeTypes.store';
 import { useSettingsStore } from '@/stores/settings.store';
 import { useWorkflowsStore } from '@/stores/workflows.store';
 import { isCredentialOnlyNodeType } from '@/utils/credentialOnlyNodes';
-import { N8nIcon, N8nInput, N8nInputNumber, N8nOption, N8nSelect } from '@n8n/design-system';
-import type { EventBus } from '@n8n/utils/event-bus';
-import { createEventBus } from '@n8n/utils/event-bus';
+import { N8nIcon, N8nInput, N8nInputNumber, N8nOption, N8nSelect } from 'n8n-design-system';
+import type { EventBus } from 'n8n-design-system/utils';
+import { createEventBus } from 'n8n-design-system/utils';
 import { useRouter } from 'vue-router';
-import { useElementSize } from '@vueuse/core';
-import { captureMessage } from '@sentry/vue';
-import { completeExpressionSyntax, shouldConvertToExpression } from '@/utils/expressions';
-import { isPresent } from '@/utils/typesUtils';
-import CssEditor from './CssEditor/CssEditor.vue';
 
 type Picker = { $emit: (arg0: string, arg1: Date) => void };
 
@@ -95,7 +90,6 @@ type Props = {
 	hideIssues?: boolean;
 	errorHighlight?: boolean;
 	isForCredential?: boolean;
-	canBeOverridden?: boolean;
 };
 
 const props = withDefaults(defineProps<Props>(), {
@@ -122,7 +116,7 @@ const emit = defineEmits<{
 const externalHooks = useExternalHooks();
 const i18n = useI18n();
 const nodeHelpers = useNodeHelpers();
-const { debounce } = useDebounce();
+const { callDebounced } = useDebounce();
 const router = useRouter();
 const workflowHelpers = useWorkflowHelpers({ router });
 const telemetry = useTelemetry();
@@ -345,7 +339,6 @@ const getIssues = computed<string[]>(() => {
 		node.value.parameters,
 		newPath.join('.'),
 		node.value,
-		nodeTypesStore.getNodeType(node.value.type, node.value.typeVersion),
 	);
 
 	if (props.parameter.type === 'credentialsSelect' && displayValue.value === '') {
@@ -372,7 +365,7 @@ const getIssues = computed<string[]>(() => {
 			if (Array.isArray(displayValue.value)) {
 				checkValues = checkValues.concat(displayValue.value);
 			} else {
-				checkValues.push(displayValue.value);
+				checkValues.push(displayValue.value as string);
 			}
 		}
 
@@ -396,21 +389,6 @@ const getIssues = computed<string[]>(() => {
 		issues.parameters[props.parameter.name] = [
 			`There was a problem loading the parameter options from server: "${remoteParameterOptionsLoadingIssues.value}"`,
 		];
-	} else if (props.parameter.type === 'workflowSelector') {
-		const selected = modelValueResourceLocator.value?.value;
-		if (selected) {
-			const isSelectedArchived = workflowsStore.allWorkflows.some(
-				(resource) => resource.id === selected && resource.isArchived,
-			);
-
-			if (isSelectedArchived) {
-				if (issues.parameters === undefined) {
-					issues.parameters = {};
-				}
-				const issue = i18n.baseText('parameterInput.selectedWorkflowIsArchived');
-				issues.parameters[props.parameter.name] = [issue];
-			}
-		}
 	}
 
 	if (issues?.parameters?.[props.parameter.name] !== undefined) {
@@ -420,14 +398,7 @@ const getIssues = computed<string[]>(() => {
 	return [];
 });
 
-const displayIssues = computed(
-	() =>
-		props.parameter.type !== 'credentialsSelect' &&
-		!isResourceLocatorParameter.value &&
-		getIssues.value.length > 0,
-);
-
-const editorType = computed<EditorType | 'json' | 'code' | 'cssEditor'>(() => {
+const editorType = computed<EditorType | 'json' | 'code'>(() => {
 	return getArgument<EditorType>('editor');
 });
 const editorIsReadOnly = computed<boolean>(() => {
@@ -440,30 +411,27 @@ const editorLanguage = computed<CodeNodeEditorLanguage>(() => {
 	return getArgument<CodeNodeEditorLanguage>('editorLanguage') ?? 'javaScript';
 });
 
-const parameterOptions = computed(() => {
-	const options = hasRemoteMethod.value ? remoteParameterOptions.value : props.parameter.options;
-	const safeOptions = (options ?? []).filter(isValidParameterOption);
+const parameterOptions = computed<INodePropertyOptions[] | undefined>(() => {
+	if (!hasRemoteMethod.value) {
+		// Options are already given
+		return props.parameter.options as INodePropertyOptions[];
+	}
 
-	return safeOptions;
+	// Options get loaded from server
+	return remoteParameterOptions.value;
 });
 
-const isSwitch = computed(
-	() => props.parameter.type === 'boolean' && !isModelValueExpression.value,
-);
-
-const isTextarea = computed(
-	() => props.parameter.type === 'string' && editorRows.value !== undefined,
-);
-
 const parameterInputClasses = computed(() => {
-	const classes: Record<string, boolean> = {
+	const classes: { [c: string]: boolean } = {
 		droppable: props.droppable,
 		activeDrop: props.activeDrop,
 	};
 
-	if (isSwitch.value) {
-		classes['parameter-switch'] = true;
-	} else {
+	const rows = editorRows.value;
+	const isTextarea = props.parameter.type === 'string' && rows !== undefined;
+	const isSwitch = props.parameter.type === 'boolean' && !isModelValueExpression.value;
+
+	if (!isTextarea && !isSwitch) {
 		classes['parameter-value-container'] = true;
 	}
 
@@ -506,10 +474,6 @@ const shortPath = computed<string>(() => {
 	const short = props.path.split('.');
 	short.shift();
 	return short.join('.');
-});
-
-const parameterId = computed(() => {
-	return `${node.value?.id ?? crypto.randomUUID()}${props.path}`;
 });
 
 const isResourceLocatorParameter = computed<boolean>(() => {
@@ -585,12 +549,6 @@ const shouldCaptureForPosthog = computed(() => {
 	}
 	return false;
 });
-
-function isValidParameterOption(
-	option: INodePropertyOptions | INodeProperties | INodePropertyCollection,
-): option is INodePropertyOptions {
-	return 'value' in option && isPresent(option.value) && isPresent(option.name);
-}
 
 function isRemoteParameterOption(option: INodePropertyOptions) {
 	return remoteParameterOptionsKeys.value.includes(option.name);
@@ -756,41 +714,8 @@ function onBlur() {
 	isFocused.value = false;
 }
 
-function onPaste(event: ClipboardEvent) {
-	const pastedText = event.clipboardData?.getData('text');
-	const input = event.target;
-
-	if (!(input instanceof HTMLInputElement)) return;
-
-	const start = input.selectionStart ?? 0;
-
-	// When a value starting with `=` is pasted that does not contain expression syntax ({{}})
-	// Add an extra `=` to go into expression mode and preserve the original pasted text
-	if (pastedText && pastedText.startsWith('=') && !pastedText.match(/{{.*?}}/g) && start === 0) {
-		event.preventDefault();
-
-		const end = input.selectionEnd ?? start;
-		const text = input.value;
-		const withExpressionPrefix = '=' + pastedText;
-
-		input.value = text.substring(0, start) + withExpressionPrefix + text.substring(end);
-		input.selectionStart = input.selectionEnd = start + withExpressionPrefix.length;
-
-		valueChanged(input.value);
-	}
-}
-
 function onResourceLocatorDrop(data: string) {
 	emit('drop', data);
-}
-
-function selectInput() {
-	const inputRef = inputField.value;
-	if (inputRef) {
-		if ('select' in inputRef) {
-			inputRef.select();
-		}
-	}
 }
 
 async function setFocus() {
@@ -848,9 +773,9 @@ function onTextInputChange(value: string) {
 
 	emit('textInput', parameterData);
 }
-
-const valueChangedDebounced = debounce(valueChanged, { debounceTime: 100 });
-
+function valueChangedDebounced(value: NodeParameterValueType | {} | Date) {
+	void callDebounced(valueChanged, { debounceTime: 100 }, value);
+}
 function onUpdateTextInput(value: string) {
 	valueChanged(value);
 	onTextInputChange(value);
@@ -860,30 +785,17 @@ function valueChanged(value: NodeParameterValueType | {} | Date) {
 	if (remoteParameterOptionsLoading.value) {
 		return;
 	}
-
-	const oldValue = get(node.value, props.path);
-
+	// Only update the value if it has changed
+	const oldValue = node.value?.parameters
+		? nodeHelpers.getParameterValue(node.value?.parameters, props.parameter.name, '')
+		: undefined;
 	if (oldValue !== undefined && oldValue === value) {
-		// Only update the value if it has changed
 		return;
-	}
-
-	const isSpecializedEditor = props.parameter.typeOptions?.editor !== undefined;
-
-	if (
-		!oldValue &&
-		oldValue !== undefined &&
-		shouldConvertToExpression(value, isSpecializedEditor)
-	) {
-		// if empty old value and updated value has an expression, add '=' prefix to switch to expression mode
-		value = '=' + value;
 	}
 
 	if (props.parameter.name === 'nodeCredentialType') {
 		activeCredentialType.value = value as string;
 	}
-
-	value = completeExpressionSyntax(value, isSpecializedEditor);
 
 	if (value instanceof Date) {
 		value = value.toISOString();
@@ -921,25 +833,6 @@ function valueChanged(value: NodeParameterValueType | {} | Date) {
 			parameter: props.parameter.name,
 		});
 	}
-	// Track workflow input data mode change
-	const isWorkflowInputParameter =
-		props.parameter.name === 'inputSource' && props.parameter.default === 'workflowInputs';
-	if (isWorkflowInputParameter) {
-		trackWorkflowInputModeEvent(value as string);
-	}
-}
-
-function trackWorkflowInputModeEvent(value: string) {
-	const telemetryValuesMap: Record<string, string> = {
-		workflowInputs: 'fields',
-		jsonExample: 'json',
-		passthrough: 'all',
-	};
-	telemetry.track('User chose input data mode', {
-		option: telemetryValuesMap[value],
-		workflow_id: workflowsStore.workflowId,
-		node_id: node.value?.id,
-	});
 }
 
 async function optionSelected(command: string) {
@@ -963,8 +856,6 @@ async function optionSelected(command: string) {
 			(!props.modelValue || props.modelValue === '[Object: null]')
 		) {
 			valueChanged('={{ 0 }}');
-		} else if (props.parameter.type === 'multiOptions') {
-			valueChanged(`={{ ${JSON.stringify(props.modelValue)} }}`);
 		} else if (
 			props.parameter.type === 'number' ||
 			props.parameter.type === 'boolean' ||
@@ -992,18 +883,11 @@ async function optionSelected(command: string) {
 		if (isResourceLocatorParameter.value && isResourceLocatorValue(props.modelValue)) {
 			valueChanged({ __rl: true, value, mode: props.modelValue.mode });
 		} else {
-			let newValue: NodeParameterValueType | {} = typeof value !== 'undefined' ? value : null;
+			let newValue = typeof value !== 'undefined' ? value : null;
 
 			if (props.parameter.type === 'string') {
 				// Strip the '=' from the beginning
-				newValue = modelValueString.value
-					? modelValueString.value.toString().replace(/^=+/, '')
-					: null;
-			} else if (newValue === null) {
-				// Invalid expressions land here
-				if (['number', 'boolean'].includes(props.parameter.type)) {
-					newValue = props.parameter.default;
-				}
+				newValue = modelValueString.value ? modelValueString.value.toString().substring(1) : null;
 			}
 			valueChanged(newValue);
 		}
@@ -1034,7 +918,7 @@ async function optionSelected(command: string) {
 onMounted(() => {
 	props.eventBus.on('optionSelected', optionSelected);
 
-	tempValue.value = displayValue.value;
+	tempValue.value = displayValue.value as string;
 
 	if (node.value) {
 		nodeName.value = node.value.name;
@@ -1050,7 +934,7 @@ onMounted(() => {
 		displayValue.value !== null &&
 		displayValue.value.toString().charAt(0) !== '#'
 	) {
-		const newValue = rgbaToHex(displayValue.value);
+		const newValue = rgbaToHex(displayValue.value as string);
 		if (newValue !== null) {
 			tempValue.value = newValue;
 		}
@@ -1062,39 +946,7 @@ onMounted(() => {
 	});
 });
 
-const { height } = useElementSize(wrapper);
-
-const isSingleLineInput = computed(() => {
-	if (isTextarea.value && !isModelValueExpression.value) {
-		return false;
-	}
-
-	/**
-	 * There is an awkward edge case here with text boxes that automatically
-	 * adjust their row count based on their content:
-	 *
-	 * If we move the overrideButton to the options row due to going multiline,
-	 * the text area gains more width and might return to single line.
-	 * This then causes the overrideButton to move inline, creating a loop which results in flickering UI.
-	 *
-	 * To avoid this, we treat 2 rows of input as single line if we were already single line.
-	 */
-	if (isSingleLineInput.value) {
-		return height.value <= 70;
-	}
-
-	return height.value <= 35;
-});
-
-defineExpose({
-	isSingleLineInput,
-	displaysIssues: displayIssues.value,
-	focusInput: async () => await setFocus(),
-	selectInput: () => selectInput(),
-});
-
 onBeforeUnmount(() => {
-	valueChangedDebounced.cancel();
 	props.eventBus.off('optionSelected', optionSelected);
 });
 
@@ -1121,43 +973,21 @@ watch(
 			// Do not set for color with alpha else wrong value gets displayed in field
 			return;
 		}
-		tempValue.value = displayValue.value;
+		tempValue.value = displayValue.value as string;
 	},
 );
 
 watch(remoteParameterOptionsLoading, () => {
-	tempValue.value = displayValue.value;
+	tempValue.value = displayValue.value as string;
 });
 
-// Focus input field when changing between fixed and expression
+// Focus input field when changing from fixed value to expression
 watch(isModelValueExpression, async (isExpression, wasExpression) => {
-	if (!props.isReadOnly && isExpression !== wasExpression) {
+	if (!props.isReadOnly && isExpression && !wasExpression) {
 		await nextTick();
-		await setFocus();
+		inputField.value?.focus();
 	}
 });
-
-// Investigate invalid parameter options
-// Sentry issue: https://n8nio.sentry.io/issues/6275981089/?project=4503960699273216
-const unwatchParameterOptions = watch(
-	[remoteParameterOptions, () => props.parameter.options],
-	([remoteOptions, options]) => {
-		const allOptions = [...remoteOptions, ...(options ?? [])];
-		const invalidOptions = allOptions.filter((option) => !isValidParameterOption(option));
-
-		if (invalidOptions.length > 0) {
-			captureMessage('Invalid parameter options', {
-				level: 'error',
-				extra: {
-					invalidOptions,
-					parameter: props.parameter.name,
-					node: node.value,
-				},
-			});
-			unwatchParameterOptions();
-		}
-	},
-);
 
 onUpdated(async () => {
 	await nextTick();
@@ -1193,16 +1023,7 @@ onUpdated(async () => {
 			@update:model-value="expressionUpdated"
 		></ExpressionEditModal>
 
-		<div
-			:class="[
-				'parameter-input',
-				'ignore-key-press-canvas',
-				{
-					[$style.noRightCornersInput]: canBeOverridden,
-				},
-			]"
-			:style="parameterInputWrapperStyle"
-		>
+		<div class="parameter-input ignore-key-press-canvas" :style="parameterInputWrapperStyle">
 			<ResourceLocator
 				v-if="parameter.type === 'resourceLocator'"
 				ref="resourceLocator"
@@ -1269,20 +1090,21 @@ onUpdated(async () => {
 				"
 			>
 				<el-dialog
-					width="calc(100% - var(--spacing-3xl))"
-					:class="$style.modal"
 					:model-value="codeEditDialogVisible"
 					:append-to="`#${APP_MODALS_ELEMENT_ID}`"
+					width="80%"
 					:title="`${i18n.baseText('codeEdit.edit')} ${i18n
 						.nodeText()
 						.inputLabelDisplayName(parameter, path)}`"
 					:before-close="closeCodeEditDialog"
 					data-test-id="code-editor-fullscreen"
 				>
-					<div class="ignore-key-press-canvas code-edit-dialog">
+					<div
+						:key="codeEditDialogVisible.toString()"
+						class="ignore-key-press-canvas code-edit-dialog"
+					>
 						<CodeNodeEditor
-							v-if="editorType === 'codeNodeEditor' && codeEditDialogVisible"
-							:id="parameterId"
+							v-if="editorType === 'codeNodeEditor'"
 							:mode="codeEditorMode"
 							:model-value="modelValueString"
 							:default-value="parameter.default"
@@ -1292,7 +1114,7 @@ onUpdated(async () => {
 							@update:model-value="valueChangedDebounced"
 						/>
 						<HtmlEditor
-							v-else-if="editorType === 'htmlEditor' && codeEditDialogVisible"
+							v-else-if="editorType === 'htmlEditor'"
 							:model-value="modelValueString"
 							:is-read-only="isReadOnly"
 							:rows="editorRows"
@@ -1301,16 +1123,8 @@ onUpdated(async () => {
 							fullscreen
 							@update:model-value="valueChangedDebounced"
 						/>
-						<CssEditor
-							v-else-if="editorType === 'cssEditor' && codeEditDialogVisible"
-							:model-value="modelValueString"
-							:is-read-only="isReadOnly"
-							:rows="editorRows"
-							fullscreen
-							@update:model-value="valueChangedDebounced"
-						/>
 						<SqlEditor
-							v-else-if="editorType === 'sqlEditor' && codeEditDialogVisible"
+							v-else-if="editorType === 'sqlEditor'"
 							:model-value="modelValueString"
 							:dialect="getArgument('sqlDialect')"
 							:is-read-only="isReadOnly"
@@ -1319,7 +1133,7 @@ onUpdated(async () => {
 							@update:model-value="valueChangedDebounced"
 						/>
 						<JsEditor
-							v-else-if="editorType === 'jsEditor' && codeEditDialogVisible"
+							v-else-if="editorType === 'jsEditor'"
 							:model-value="modelValueString"
 							:is-read-only="isReadOnly"
 							:rows="editorRows"
@@ -1329,12 +1143,11 @@ onUpdated(async () => {
 						/>
 
 						<JsonEditor
-							v-else-if="parameter.type === 'json' && codeEditDialogVisible"
+							v-else-if="parameter.type === 'json'"
 							:model-value="modelValueString"
 							:is-read-only="isReadOnly"
 							:rows="editorRows"
 							fullscreen
-							fill-parent
 							@update:model-value="valueChangedDebounced"
 						/>
 					</div>
@@ -1351,8 +1164,8 @@ onUpdated(async () => {
 				></TextEdit>
 
 				<CodeNodeEditor
-					v-if="editorType === 'codeNodeEditor' && isCodeNode && !codeEditDialogVisible"
-					:id="parameterId"
+					v-if="editorType === 'codeNodeEditor' && isCodeNode"
+					:key="'code-' + codeEditDialogVisible.toString()"
 					:mode="codeEditorMode"
 					:model-value="modelValueString"
 					:default-value="parameter.default"
@@ -1376,7 +1189,8 @@ onUpdated(async () => {
 				</CodeNodeEditor>
 
 				<HtmlEditor
-					v-else-if="editorType === 'htmlEditor' && !codeEditDialogVisible"
+					v-else-if="editorType === 'htmlEditor'"
+					:key="'html-' + codeEditDialogVisible.toString()"
 					:model-value="modelValueString"
 					:is-read-only="isReadOnly"
 					:rows="editorRows"
@@ -1396,27 +1210,9 @@ onUpdated(async () => {
 					</template>
 				</HtmlEditor>
 
-				<CssEditor
-					v-else-if="editorType === 'cssEditor' && !codeEditDialogVisible"
-					:model-value="modelValueString"
-					:is-read-only="isReadOnly"
-					:rows="editorRows"
-					@update:model-value="valueChangedDebounced"
-				>
-					<template #suffix>
-						<N8nIcon
-							data-test-id="code-editor-fullscreen-button"
-							icon="external-link-alt"
-							size="xsmall"
-							class="textarea-modal-opener"
-							:title="i18n.baseText('parameterInput.openEditWindow')"
-							@click="displayEditDialog()"
-						/>
-					</template>
-				</CssEditor>
-
 				<SqlEditor
 					v-else-if="editorType === 'sqlEditor'"
+					:key="'sql-' + codeEditDialogVisible.toString()"
 					:model-value="modelValueString"
 					:dialect="getArgument('sqlDialect')"
 					:is-read-only="isReadOnly"
@@ -1437,6 +1233,7 @@ onUpdated(async () => {
 
 				<JsEditor
 					v-else-if="editorType === 'jsEditor'"
+					:key="'js-' + codeEditDialogVisible.toString()"
 					:model-value="modelValueString"
 					:is-read-only="isReadOnly || editorIsReadOnly"
 					:rows="editorRows"
@@ -1457,7 +1254,8 @@ onUpdated(async () => {
 				</JsEditor>
 
 				<JsonEditor
-					v-else-if="parameter.type === 'json' && !codeEditDialogVisible"
+					v-else-if="parameter.type === 'json'"
+					:key="'json-' + codeEditDialogVisible.toString()"
 					:model-value="modelValueString"
 					:is-read-only="isReadOnly"
 					:rows="editorRows"
@@ -1478,7 +1276,6 @@ onUpdated(async () => {
 				<div v-else-if="editorType" class="readonly-code clickable" @click="displayEditDialog()">
 					<CodeNodeEditor
 						v-if="!codeEditDialogVisible"
-						:id="parameterId"
 						:mode="codeEditorMode"
 						:model-value="modelValueString"
 						:language="editorLanguage"
@@ -1507,7 +1304,6 @@ onUpdated(async () => {
 					@keydown.stop
 					@focus="setFocus"
 					@blur="onBlur"
-					@paste="onPaste"
 				>
 					<template #suffix>
 						<N8nIcon
@@ -1646,8 +1442,8 @@ onUpdated(async () => {
 						</div>
 						<div
 							v-if="option.description"
-							v-n8n-html="getOptionsOptionDescription(option)"
 							class="option-description"
+							v-n8n-html="getOptionsOptionDescription(option)"
 						></div>
 					</div>
 				</N8nOption>
@@ -1679,8 +1475,8 @@ onUpdated(async () => {
 						<div class="option-headline">{{ getOptionsOptionDisplayName(option) }}</div>
 						<div
 							v-if="option.description"
-							v-n8n-html="getOptionsOptionDescription(option)"
 							class="option-description"
+							v-n8n-html="getOptionsOptionDescription(option)"
 						></div>
 					</div>
 				</N8nOption>
@@ -1707,19 +1503,11 @@ onUpdated(async () => {
 				<InlineExpressionTip />
 			</div>
 		</div>
-		<div
-			v-if="$slots.overrideButton"
-			:class="[
-				$style.overrideButton,
-				{
-					[$style.overrideButtonStandalone]: isSwitch,
-					[$style.overrideButtonInline]: !isSwitch,
-				},
-			]"
-		>
-			<slot name="overrideButton" />
-		</div>
-		<ParameterIssues v-if="displayIssues" :issues="getIssues" />
+
+		<ParameterIssues
+			v-if="parameter.type !== 'credentialsSelect' && !isResourceLocatorParameter"
+			:issues="getIssues"
+		/>
 	</div>
 </template>
 
@@ -1740,13 +1528,6 @@ onUpdated(async () => {
 .parameter-actions {
 	display: inline-flex;
 	align-items: center;
-}
-
-.parameter-switch {
-	display: inline-flex;
-	align-self: flex-start;
-	justify-items: center;
-	gap: var(--spacing-xs);
 }
 
 .parameter-input {
@@ -1809,7 +1590,7 @@ onUpdated(async () => {
 	padding-right: 20px;
 
 	.option-headline {
-		font-weight: var(--font-weight-medium);
+		font-weight: var(--font-weight-bold);
 		line-height: var(--font-line-height-regular);
 		overflow-wrap: break-word;
 	}
@@ -1847,8 +1628,8 @@ onUpdated(async () => {
 
 .textarea-modal-opener {
 	position: absolute;
-	right: 1px;
-	bottom: 1px;
+	right: 0;
+	bottom: 0;
 	background-color: var(--color-code-background);
 	padding: 3px;
 	line-height: 9px;
@@ -1856,8 +1637,6 @@ onUpdated(async () => {
 	border-top-left-radius: var(--border-radius-base);
 	border-bottom-right-radius: var(--border-radius-base);
 	cursor: pointer;
-	border-right: none;
-	border-bottom: none;
 
 	svg {
 		width: 9px !important;
@@ -1879,7 +1658,7 @@ onUpdated(async () => {
 }
 
 .code-edit-dialog {
-	height: 100%;
+	height: 70vh;
 
 	.code-node-editor {
 		height: 100%;
@@ -1887,25 +1666,7 @@ onUpdated(async () => {
 }
 </style>
 
-<style lang="css" module>
-.modal {
-	--dialog-close-top: var(--spacing-m);
-	display: flex;
-	flex-direction: column;
-	overflow: clip;
-	height: calc(100% - var(--spacing-4xl));
-	margin-bottom: 0;
-
-	:global(.el-dialog__header) {
-		padding-bottom: 0;
-	}
-
-	:global(.el-dialog__body) {
-		height: calc(100% - var(--spacing-3xl));
-		padding: var(--spacing-s);
-	}
-}
-
+<style lang="scss" module>
 .tipVisible {
 	--input-border-bottom-left-radius: 0;
 	--input-border-bottom-right-radius: 0;
@@ -1922,27 +1683,5 @@ onUpdated(async () => {
 	box-shadow: 0 2px 6px 0 rgba(#441c17, 0.1);
 	border-bottom-left-radius: 4px;
 	border-bottom-right-radius: 4px;
-}
-
-.noRightCornersInput > * {
-	--input-border-bottom-right-radius: 0;
-	--input-border-top-right-radius: 0;
-}
-
-.overrideButton {
-	align-self: start;
-}
-
-.overrideButtonStandalone {
-	position: relative;
-	/* This is to balance for the extra margin on the switch */
-	top: -2px;
-}
-
-.overrideButtonInline {
-	> button {
-		border-top-left-radius: 0;
-		border-bottom-left-radius: 0;
-	}
 }
 </style>

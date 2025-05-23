@@ -2,8 +2,7 @@ import { merge } from 'lodash-es';
 import userEvent from '@testing-library/user-event';
 
 import { SETTINGS_STORE_DEFAULT_STATE } from '@/__tests__/utils';
-import { ROLE } from '@/constants';
-import { STORES } from '@n8n/stores';
+import { ROLE, STORES } from '@/constants';
 
 import { createTestingPinia } from '@pinia/testing';
 import BannerStack from '@/components/banners/BannerStack.vue';

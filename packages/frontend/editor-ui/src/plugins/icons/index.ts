@@ -23,17 +23,12 @@ import {
 	faBrain,
 	faCalculator,
 	faCalendar,
-	faCaretDown,
-	faCaretRight,
-	faCaretUp,
 	faChartBar,
 	faCheck,
 	faCheckCircle,
-	faCheckDouble,
 	faCheckSquare,
 	faChevronDown,
 	faChevronUp,
-	faCircle,
 	faChevronLeft,
 	faChevronRight,
 	faCode,
@@ -58,7 +53,6 @@ import {
 	faEnvelope,
 	faEquals,
 	faEye,
-	faEyeSlash,
 	faExclamationTriangle,
 	faExpand,
 	faExpandAlt,
@@ -75,9 +69,7 @@ import {
 	faFilter,
 	faFingerprint,
 	faFlask,
-	faFolder,
 	faFolderOpen,
-	faFolderPlus,
 	faFont,
 	faGlobeAmericas,
 	faGift,
@@ -89,7 +81,6 @@ import {
 	faHandScissors,
 	faHandPointLeft,
 	faHandshake,
-	faUserCheck,
 	faHashtag,
 	faHdd,
 	faHistory,
@@ -132,7 +123,6 @@ import {
 	faSearchPlus,
 	faServer,
 	faScrewdriver,
-	faShare,
 	faSmile,
 	faSignInAlt,
 	faSignOutAlt,
@@ -174,28 +164,8 @@ import {
 	faPowerOff,
 	faPaperPlane,
 	faExclamationCircle,
-	faMinusCircle,
-	faAdjust,
 } from '@fortawesome/free-solid-svg-icons';
-import {
-	faVariable,
-	faXmark,
-	faVault,
-	faRefresh,
-	faTriangle,
-	statusCompleted,
-	statusWaiting,
-	statusError,
-	statusCanceled,
-	statusNew,
-	statusUnknown,
-	statusWarning,
-	faPopOut,
-	faJSON,
-	faSchema,
-	faBinary,
-	faText,
-} from './custom';
+import { faVariable, faXmark, faVault, faRefresh } from './custom';
 import { faStickyNote } from '@fortawesome/free-regular-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 
@@ -226,19 +196,14 @@ export const FontAwesomePlugin: Plugin = {
 		addIcon(faBrain);
 		addIcon(faCalculator);
 		addIcon(faCalendar);
-		addIcon(faCaretDown);
-		addIcon(faCaretRight);
-		addIcon(faCaretUp);
 		addIcon(faChartBar);
 		addIcon(faCheck);
 		addIcon(faCheckCircle);
-		addIcon(faCheckDouble);
 		addIcon(faCheckSquare);
 		addIcon(faChevronLeft);
 		addIcon(faChevronRight);
 		addIcon(faChevronDown);
 		addIcon(faChevronUp);
-		addIcon(faCircle);
 		addIcon(faCode);
 		addIcon(faCodeBranch);
 		addIcon(faCog);
@@ -263,7 +228,6 @@ export const FontAwesomePlugin: Plugin = {
 		addIcon(faEnvelope);
 		addIcon(faEquals);
 		addIcon(faEye);
-		addIcon(faEyeSlash);
 		addIcon(faExclamationTriangle);
 		addIcon(faExclamationCircle);
 		addIcon(faExpand);
@@ -281,9 +245,7 @@ export const FontAwesomePlugin: Plugin = {
 		addIcon(faFilter);
 		addIcon(faFingerprint);
 		addIcon(faFlask);
-		addIcon(faFolder);
 		addIcon(faFolderOpen);
-		addIcon(faFolderPlus);
 		addIcon(faFont);
 		addIcon(faGift);
 		addIcon(faGlobe);
@@ -294,7 +256,6 @@ export const FontAwesomePlugin: Plugin = {
 		addIcon(faHandshake);
 		addIcon(faHandPointLeft);
 		addIcon(faHashtag);
-		addIcon(faUserCheck);
 		addIcon(faHdd);
 		addIcon(faHistory);
 		addIcon(faHome);
@@ -338,7 +299,6 @@ export const FontAwesomePlugin: Plugin = {
 		addIcon(faSearchPlus);
 		addIcon(faServer);
 		addIcon(faScrewdriver);
-		addIcon(faShare);
 		addIcon(faSmile);
 		addIcon(faSignInAlt);
 		addIcon(faSignOutAlt);
@@ -364,7 +324,6 @@ export const FontAwesomePlugin: Plugin = {
 		addIcon(faToolbox);
 		addIcon(faTools);
 		addIcon(faTrash);
-		addIcon(faTriangle);
 		addIcon(faUndo);
 		addIcon(faUnlink);
 		addIcon(faUser);
@@ -383,22 +342,6 @@ export const FontAwesomePlugin: Plugin = {
 		addIcon(faPowerOff);
 		addIcon(faPaperPlane);
 		addIcon(faRefresh);
-		addIcon(faMinusCircle);
-		addIcon(faAdjust);
-		// statuses
-		addIcon(statusCompleted);
-		addIcon(statusWaiting);
-		addIcon(statusError);
-		addIcon(statusCanceled);
-		addIcon(statusNew);
-		addIcon(statusUnknown);
-		addIcon(statusWarning);
-
-		addIcon(faPopOut);
-		addIcon(faSchema);
-		addIcon(faJSON);
-		addIcon(faBinary);
-		addIcon(faText);
 
 		app.component('FontAwesomeIcon', FontAwesomeIcon);
 	},

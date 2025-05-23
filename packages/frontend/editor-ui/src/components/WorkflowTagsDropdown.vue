@@ -3,7 +3,7 @@ import { computed } from 'vue';
 import { useUIStore } from '@/stores/ui.store';
 import { useTagsStore } from '@/stores/tags.store';
 import { TAGS_MANAGER_MODAL_KEY } from '@/constants';
-import type { EventBus } from '@n8n/utils/event-bus';
+import type { EventBus } from 'n8n-design-system';
 
 interface TagsDropdownWrapperProps {
 	placeholder?: string;
@@ -15,7 +15,7 @@ interface TagsDropdownWrapperProps {
 const props = withDefaults(defineProps<TagsDropdownWrapperProps>(), {
 	placeholder: '',
 	modelValue: () => [],
-	createEnabled: true,
+	createEnabled: false,
 	eventBus: null,
 });
 

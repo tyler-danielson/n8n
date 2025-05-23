@@ -17,10 +17,10 @@ import {
 	LOCAL_STORAGE_NDV_INPUT_PANEL_DISPLAY_MODE,
 	LOCAL_STORAGE_NDV_OUTPUT_PANEL_DISPLAY_MODE,
 	LOCAL_STORAGE_TABLE_HOVER_IS_ONBOARDED,
+	STORES,
 } from '@/constants';
-import { STORES } from '@n8n/stores';
 import type { INodeIssues } from 'n8n-workflow';
-import { NodeConnectionTypes } from 'n8n-workflow';
+import { NodeConnectionType } from 'n8n-workflow';
 import { defineStore } from 'pinia';
 import { v4 as uuid } from 'uuid';
 import { useWorkflowsStore } from './workflows.store';
@@ -59,7 +59,6 @@ export const useNDVStore = defineStore(STORES.NDV, () => {
 		'schema',
 	);
 	const output = ref<OutputPanel>({
-		run: undefined,
 		branch: undefined,
 		data: {
 			isEmpty: true,
@@ -182,7 +181,7 @@ export const useNDVStore = defineStore(STORES.NDV, () => {
 			return false;
 		}
 		const workflow = workflowsStore.getCurrentWorkflow();
-		const parentNodes = workflow.getParentNodes(activeNode.value.name, NodeConnectionTypes.Main, 1);
+		const parentNodes = workflow.getParentNodes(activeNode.value.name, NodeConnectionType.Main, 1);
 		return parentNodes.includes(inputNodeName);
 	});
 
@@ -223,10 +222,6 @@ export const useNDVStore = defineStore(STORES.NDV, () => {
 
 	const setInputRunIndex = (run?: number): void => {
 		input.value.run = run;
-	};
-
-	const setOutputRunIndex = (run?: number): void => {
-		output.value.run = run;
 	};
 
 	const setMainPanelDimensions = (params: {
@@ -274,11 +269,7 @@ export const useNDVStore = defineStore(STORES.NDV, () => {
 		type,
 		data,
 		dimensions,
-	}: {
-		type: string;
-		data: string;
-		dimensions: DOMRect | null;
-	}): void => {
+	}: { type: string; data: string; dimensions: DOMRect | null }): void => {
 		draggable.value = {
 			isDragging: true,
 			type,
@@ -323,7 +314,10 @@ export const useNDVStore = defineStore(STORES.NDV, () => {
 		}
 	};
 
-	const setNDVPanelDataIsEmpty = (params: { panel: NodePanelType; isEmpty: boolean }): void => {
+	const setNDVPanelDataIsEmpty = (params: {
+		panel: NodePanelType;
+		isEmpty: boolean;
+	}): void => {
 		if (params.panel === 'input') {
 			input.value.data.isEmpty = params.isEmpty;
 		} else {
@@ -412,7 +406,6 @@ export const useNDVStore = defineStore(STORES.NDV, () => {
 		setActiveNodeName,
 		setInputNodeName,
 		setInputRunIndex,
-		setOutputRunIndex,
 		setMainPanelDimensions,
 		setNDVPushRef,
 		resetNDVPushRef,

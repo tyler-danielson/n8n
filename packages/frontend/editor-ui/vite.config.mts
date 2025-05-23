@@ -1,10 +1,9 @@
 import vue from '@vitejs/plugin-vue';
-import { posix as pathPosix, resolve } from 'path';
+import { resolve } from 'path';
 import { defineConfig, mergeConfig } from 'vite';
-import { viteStaticCopy } from 'vite-plugin-static-copy';
 import svgLoader from 'vite-svg-loader';
 
-import { vitestConfig } from '@n8n/vitest-config/frontend';
+import { vitestConfig } from '../design-system/vite.config.mts';
 import icons from 'unplugin-icons/vite';
 import iconsResolver from 'unplugin-icons/resolver';
 import components from 'unplugin-vue-components/vite';
@@ -18,30 +17,24 @@ const { NODE_ENV } = process.env;
 
 const browsers = browserslist.loadConfig({ path: process.cwd() });
 
-const packagesDir = resolve(__dirname, '..', '..');
-
 const alias = [
 	{ find: '@', replacement: resolve(__dirname, 'src') },
 	{ find: 'stream', replacement: 'stream-browserify' },
 	{
-		find: /^@n8n\/chat(.+)$/,
-		replacement: resolve(packagesDir, 'frontend', '@n8n', 'chat', 'src$1'),
+		find: /^n8n-design-system$/,
+		replacement: resolve(__dirname, '..', 'design-system', 'src', 'main.ts'),
 	},
 	{
-		find: /^@n8n\/composables(.+)$/,
-		replacement: resolve(packagesDir, 'frontend', '@n8n', 'composables', 'src$1'),
+		find: /^n8n-design-system\//,
+		replacement: resolve(__dirname, '..', 'design-system', 'src') + '/',
 	},
 	{
-		find: /^@n8n\/design-system(.+)$/,
-		replacement: resolve(packagesDir, 'frontend', '@n8n', 'design-system', 'src$1'),
+		find: /^@n8n\/chat$/,
+		replacement: resolve(__dirname, '..', '@n8n', 'chat', 'src', 'index.ts'),
 	},
 	{
-		find: /^@n8n\/stores(.+)$/,
-		replacement: resolve(packagesDir, 'frontend', '@n8n', 'stores', 'src$1'),
-	},
-	{
-		find: /^@n8n\/utils(.+)$/,
-		replacement: resolve(packagesDir, '@n8n', 'utils', 'src$1'),
+		find: /^@n8n\/chat\//,
+		replacement: resolve(__dirname, '..', '@n8n', 'chat', 'src') + '/',
 	},
 	...['orderBy', 'camelCase', 'cloneDeep', 'startCase'].map((name) => ({
 		find: new RegExp(`^lodash.${name}$`, 'i'),
@@ -66,34 +59,8 @@ const plugins = [
 			}),
 		],
 	}),
-	viteStaticCopy({
-		targets: [
-			{
-				src: pathPosix.resolve('node_modules/web-tree-sitter/tree-sitter.wasm'),
-				dest: resolve(__dirname, 'dist'),
-			},
-			{
-				src: pathPosix.resolve('node_modules/curlconverter/dist/tree-sitter-bash.wasm'),
-				dest: resolve(__dirname, 'dist'),
-			},
-		],
-	}),
 	vue(),
-	svgLoader({
-		svgoConfig: {
-			plugins: [
-				{
-					name: 'preset-default',
-					params: {
-						overrides: {
-							// disable a default plugin
-							cleanupIds: false,
-						},
-					},
-				},
-			],
-		},
-	}),
+	svgLoader(),
 	legacy({
 		modernTargets: browsers,
 		modernPolyfills: true,
@@ -102,7 +69,6 @@ const plugins = [
 ];
 
 const { RELEASE: release } = process.env;
-const target = browserslistToEsbuild(browsers);
 
 export default mergeConfig(
 	defineConfig({
@@ -119,26 +85,14 @@ export default mergeConfig(
 		css: {
 			preprocessorOptions: {
 				scss: {
-					additionalData: [
-						'',
-						'@use "@/n8n-theme-variables.scss" as *;',
-						'@use "@n8n/design-system/css/mixins" as mixins;',
-					].join('\n'),
+					additionalData: '\n@use "@/n8n-theme-variables.scss" as *;\n',
 				},
 			},
 		},
 		build: {
 			minify: !!release,
 			sourcemap: !!release,
-			target,
-		},
-		optimizeDeps: {
-			esbuildOptions: {
-				target,
-			},
-		},
-		worker: {
-			format: 'es',
+			target: browserslistToEsbuild(browsers),
 		},
 	}),
 	vitestConfig,

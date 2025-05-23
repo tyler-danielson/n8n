@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
 import {
-	NodeConnectionTypes,
+	NodeConnectionType,
 	type IRunData,
 	type IRunExecutionData,
+	type NodeError,
 	type Workflow,
 } from 'n8n-workflow';
 import RunData from './RunData.vue';
 import RunInfo from './RunInfo.vue';
 import { storeToRefs } from 'pinia';
+import { useUIStore } from '@/stores/ui.store';
 import { useWorkflowsStore } from '@/stores/workflows.store';
 import { useNDVStore } from '@/stores/ndv.store';
 import { useNodeTypesStore } from '@/stores/nodeTypes.store';
@@ -19,11 +21,7 @@ import { usePinnedData } from '@/composables/usePinnedData';
 import { useTelemetry } from '@/composables/useTelemetry';
 import { useI18n } from '@/composables/useI18n';
 import { waitingNodeTooltip } from '@/utils/executionUtils';
-import { N8nRadioButtons, N8nText } from '@n8n/design-system';
-import { useSettingsStore } from '@/stores/settings.store';
-import { useNodeDirtiness } from '@/composables/useNodeDirtiness';
-import { CanvasNodeDirtiness } from '@/types';
-import { type IRunDataDisplayMode } from '@/Interface';
+import { N8nRadioButtons, N8nText } from 'n8n-design-system';
 
 // Types
 
@@ -48,7 +46,6 @@ type Props = {
 	blockUI?: boolean;
 	isProductionExecutionPreview?: boolean;
 	isPaneActive?: boolean;
-	displayMode: IRunDataDisplayMode;
 };
 
 // Props and emits
@@ -68,7 +65,6 @@ const emit = defineEmits<{
 	itemHover: [item: { itemIndex: number; outputIndex: number } | null];
 	search: [string];
 	openSettings: [];
-	displayModeChange: [IRunDataDisplayMode];
 }>();
 
 // Stores
@@ -76,11 +72,10 @@ const emit = defineEmits<{
 const ndvStore = useNDVStore();
 const nodeTypesStore = useNodeTypesStore();
 const workflowsStore = useWorkflowsStore();
+const uiStore = useUIStore();
 const telemetry = useTelemetry();
 const i18n = useI18n();
 const { activeNode } = storeToRefs(ndvStore);
-const settings = useSettingsStore();
-const { dirtinessByName } = useNodeDirtiness();
 
 // Composables
 
@@ -89,7 +84,7 @@ const { isSubNodeType } = useNodeType({
 });
 const pinnedData = usePinnedData(activeNode, {
 	runIndex: props.runIndex,
-	displayMode: props.displayMode,
+	displayMode: ndvStore.outputPanelDisplayMode,
 });
 
 // Data
@@ -125,24 +120,21 @@ const hasAiMetadata = computed(() => {
 	return false;
 });
 
-const hasError = computed(() =>
-	Boolean(
-		workflowRunData.value &&
-			node.value &&
-			workflowRunData.value[node.value.name]?.[props.runIndex]?.error,
-	),
-);
-
 // Determine the initial output mode to logs if the node has an error and the logs are available
 const defaultOutputMode = computed<OutputType>(() => {
-	return hasError.value && hasAiMetadata.value ? OUTPUT_TYPE.LOGS : OUTPUT_TYPE.REGULAR;
+	const hasError =
+		workflowRunData.value &&
+		node.value &&
+		(workflowRunData.value[node.value.name]?.[props.runIndex]?.error as NodeError);
+
+	return Boolean(hasError) && hasAiMetadata.value ? OUTPUT_TYPE.LOGS : OUTPUT_TYPE.REGULAR;
 });
 
 const isNodeRunning = computed(() => {
 	return workflowRunning.value && !!node.value && workflowsStore.isNodeExecuting(node.value.name);
 });
 
-const workflowRunning = computed(() => workflowsStore.isWorkflowRunning);
+const workflowRunning = computed(() => uiStore.isActionActive.workflowRunning);
 
 const workflowExecution = computed(() => {
 	return workflowsStore.getWorkflowExecution;
@@ -207,11 +199,6 @@ const staleData = computed(() => {
 	if (!node.value) {
 		return false;
 	}
-
-	if (settings.partialExecutionVersion === 2) {
-		return dirtinessByName.value[node.value.name] === CanvasNodeDirtiness.PARAMETERS_UPDATED;
-	}
-
 	const updatedAt = workflowsStore.getParametersLastUpdate(node.value.name);
 	if (!updatedAt || !runTaskData.value) {
 		return false;
@@ -229,7 +216,7 @@ const canPinData = computed(() => {
 });
 
 const allToolsWereUnusedNotice = computed(() => {
-	if (!node.value || runsCount.value === 0 || hasError.value) return undefined;
+	if (!node.value || runsCount.value === 0) return undefined;
 
 	// With pinned data there's no clear correct answer for whether
 	// we should use historic or current parents, so we don't show the notice,
@@ -238,7 +225,7 @@ const allToolsWereUnusedNotice = computed(() => {
 
 	const toolsAvailable = props.workflow.getParentNodes(
 		node.value.name,
-		NodeConnectionTypes.AiTool,
+		NodeConnectionType.AiTool,
 		1,
 	);
 	const toolsUsedInLatestRun = toolsAvailable.filter(
@@ -324,7 +311,6 @@ const activatePane = () => {
 <template>
 	<RunData
 		ref="runDataRef"
-		:class="$style.runData"
 		:node="node"
 		:workflow="workflow"
 		:run-index="runIndex"
@@ -342,8 +328,6 @@ const activatePane = () => {
 		pane-type="output"
 		:data-output-type="outputMode"
 		:callout-message="allToolsWereUnusedNotice"
-		:display-mode="displayMode"
-		:disable-ai-content="true"
 		@activate-pane="activatePane"
 		@run-change="onRunIndexChange"
 		@link-run="onLinkRun"
@@ -351,7 +335,6 @@ const activatePane = () => {
 		@table-mounted="emit('tableMounted', $event)"
 		@item-hover="emit('itemHover', $event)"
 		@search="emit('search', $event)"
-		@display-mode-change="emit('displayModeChange', $event)"
 	>
 		<template #header>
 			<div :class="$style.titleSection">
@@ -367,11 +350,7 @@ const activatePane = () => {
 					{{ i18n.baseText(outputPanelEditMode.enabled ? 'ndv.output.edit' : 'ndv.output') }}
 				</span>
 				<RunInfo
-					v-if="
-						hasNodeRun &&
-						!pinnedData.hasData.value &&
-						(runsCount === 1 || (runsCount > 0 && staleData))
-					"
+					v-if="hasNodeRun && !pinnedData.hasData.value && runsCount === 1"
 					v-show="!outputPanelEditMode.enabled"
 					:task-data="runTaskData"
 					:has-stale-data="staleData"
@@ -402,9 +381,7 @@ const activatePane = () => {
 		</template>
 
 		<template #node-waiting>
-			<N8nText :bold="true" color="text-dark" size="large">
-				{{ i18n.baseText('ndv.output.waitNodeWaiting.title') }}
-			</N8nText>
+			<N8nText :bold="true" color="text-dark" size="large">Waiting for input</N8nText>
 			<N8nText v-n8n-html="waitingNodeTooltip(node)"></N8nText>
 		</template>
 
@@ -446,9 +423,6 @@ const activatePane = () => {
 :global([data-output-type='logs'] [class*='itemsCount']),
 :global([data-output-type='logs'] [class*='displayModes']) {
 	display: none;
-}
-.runData {
-	background-color: var(--color-run-data-background);
 }
 .outputTypeSelect {
 	margin-bottom: var(--spacing-4xs);

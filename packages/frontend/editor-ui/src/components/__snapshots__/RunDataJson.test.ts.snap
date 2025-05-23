@@ -8,7 +8,6 @@ exports[`RunDataJson.vue > renders json values properly 1`] = `
     <!---->
     <div
       class=""
-      data-test-id="draggable"
     >
       
       <div

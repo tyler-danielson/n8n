@@ -1,7 +1,8 @@
 import type { ComputedRef, Ref } from 'vue';
 import { computed, ref } from 'vue';
 import { v4 as uuid } from 'uuid';
-import type { ChatMessage } from '@n8n/chat/types';
+import type { ChatMessage, ChatMessageText } from '@n8n/chat/types';
+import { NodeConnectionType, CHAT_TRIGGER_NODE_TYPE } from 'n8n-workflow';
 import type {
 	ITaskData,
 	INodeExecutionData,
@@ -9,15 +10,17 @@ import type {
 	IDataObject,
 	IBinaryData,
 	BinaryFileType,
+	Workflow,
 	IRunExecutionData,
 } from 'n8n-workflow';
 import { useToast } from '@/composables/useToast';
 import { useMessage } from '@/composables/useMessage';
 import { usePinnedData } from '@/composables/usePinnedData';
-import { MODAL_CONFIRM } from '@/constants';
+import { get, isEmpty, last } from 'lodash-es';
+import { MANUAL_CHAT_TRIGGER_NODE_TYPE, MODAL_CONFIRM } from '@/constants';
 import { useI18n } from '@/composables/useI18n';
+import type { MemoryOutput } from '../types/chat';
 import type { IExecutionPushResponse, INodeUi } from '@/Interface';
-import { extractBotResponse, getInputKey } from '@/components/CanvasChat/utils';
 
 export type RunWorkflowChatPayload = {
 	triggerNode: string;
@@ -27,9 +30,12 @@ export type RunWorkflowChatPayload = {
 };
 export interface ChatMessagingDependencies {
 	chatTrigger: Ref<INodeUi | null>;
+	connectedNode: Ref<INodeUi | null>;
 	messages: Ref<ChatMessage[]>;
 	sessionId: Ref<string>;
+	workflow: ComputedRef<Workflow>;
 	executionResultData: ComputedRef<IRunExecutionData['resultData'] | undefined>;
+	getWorkflowResultDataByNodeName: (nodeName: string) => ITaskData[] | null;
 	onRunChatWorkflow: (
 		payload: RunWorkflowChatPayload,
 	) => Promise<IExecutionPushResponse | undefined>;
@@ -37,9 +43,12 @@ export interface ChatMessagingDependencies {
 
 export function useChatMessaging({
 	chatTrigger,
+	connectedNode,
 	messages,
 	sessionId,
+	workflow,
 	executionResultData,
+	getWorkflowResultDataByNodeName,
 	onRunChatWorkflow,
 }: ChatMessagingDependencies) {
 	const locale = useI18n();
@@ -105,7 +114,13 @@ export function useChatMessaging({
 			return;
 		}
 
-		const inputKey = getInputKey(triggerNode);
+		let inputKey = 'chatInput';
+		if (triggerNode.type === MANUAL_CHAT_TRIGGER_NODE_TYPE && triggerNode.typeVersion < 1.1) {
+			inputKey = 'input';
+		}
+		if (triggerNode.type === CHAT_TRIGGER_NODE_TYPE) {
+			inputKey = 'chatInput';
+		}
 
 		const inputPayload: INodeExecutionData = {
 			json: {
@@ -123,9 +138,8 @@ export function useChatMessaging({
 			inputPayload.binary = binaryData;
 		}
 		const nodeData: ITaskData = {
-			startTime: Date.now(),
+			startTime: new Date().getTime(),
 			executionTime: 0,
-			executionIndex: 0,
 			executionStatus: 'success',
 			data: {
 				main: [[inputPayload]],
@@ -144,17 +158,53 @@ export function useChatMessaging({
 			return;
 		}
 
-		const chatMessage = executionResultData.value
-			? extractBotResponse(
-					executionResultData.value,
-					response.executionId,
-					locale.baseText('chat.window.chat.response.empty'),
-				)
-			: undefined;
+		processExecutionResultData(response.executionId);
+	}
 
-		if (chatMessage !== undefined) {
-			messages.value.push(chatMessage);
+	function processExecutionResultData(executionId: string) {
+		const lastNodeExecuted = executionResultData.value?.lastNodeExecuted;
+
+		if (!lastNodeExecuted) return;
+
+		const nodeResponseDataArray = get(executionResultData.value.runData, lastNodeExecuted) ?? [];
+
+		const nodeResponseData = nodeResponseDataArray[nodeResponseDataArray.length - 1];
+
+		let responseMessage: string;
+
+		if (get(nodeResponseData, 'error')) {
+			responseMessage = '[ERROR: ' + get(nodeResponseData, 'error.message') + ']';
+		} else {
+			const responseData = get(nodeResponseData, 'data.main[0][0].json');
+			responseMessage = extractResponseMessage(responseData);
 		}
+		isLoading.value = false;
+		messages.value.push({
+			text: responseMessage,
+			sender: 'bot',
+			createdAt: new Date().toISOString(),
+			id: executionId ?? uuid(),
+		});
+	}
+
+	/** Extracts response message from workflow output */
+	function extractResponseMessage(responseData?: IDataObject) {
+		if (!responseData || isEmpty(responseData)) {
+			return locale.baseText('chat.window.chat.response.empty');
+		}
+
+		// Paths where the response message might be located
+		const paths = ['output', 'text', 'response.text'];
+		const matchedPath = paths.find((path) => get(responseData, path));
+
+		if (!matchedPath) return JSON.stringify(responseData, null, 2);
+
+		const matchedOutput = get(responseData, matchedPath);
+		if (typeof matchedOutput === 'object') {
+			return '```json\n' + JSON.stringify(matchedOutput, null, 2) + '\n```';
+		}
+
+		return matchedOutput?.toString() ?? '';
 	}
 
 	/** Sends a message to the chat */
@@ -187,6 +237,7 @@ export function useChatMessaging({
 		const newMessage: ChatMessage & { sessionId: string } = {
 			text: message,
 			sender: 'user',
+			createdAt: new Date().toISOString(),
 			sessionId: sessionId.value,
 			id: uuid(),
 			files,
@@ -196,9 +247,40 @@ export function useChatMessaging({
 		await startWorkflowWithMessage(newMessage.text, files);
 	}
 
+	function getChatMessages(): ChatMessageText[] {
+		if (!connectedNode.value) return [];
+
+		const connectedMemoryInputs =
+			workflow.value.connectionsByDestinationNode?.[connectedNode.value.name]?.[
+				NodeConnectionType.AiMemory
+			];
+		if (!connectedMemoryInputs) return [];
+
+		const memoryConnection = (connectedMemoryInputs ?? []).find((i) => (i ?? []).length > 0)?.[0];
+
+		if (!memoryConnection) return [];
+
+		const nodeResultData = getWorkflowResultDataByNodeName(memoryConnection.node);
+
+		const memoryOutputData = (nodeResultData ?? [])
+			.map((data) => get(data, ['data', NodeConnectionType.AiMemory, 0, 0, 'json']) as MemoryOutput)
+			.find((data) => data && data.action === 'saveContext');
+
+		return (memoryOutputData?.chatHistory ?? []).map((message, index) => {
+			return {
+				createdAt: new Date().toISOString(),
+				text: message.kwargs.content,
+				id: `preload__${index}`,
+				sender: last(message.id) === 'HumanMessage' ? 'user' : 'bot',
+			};
+		});
+	}
+
 	return {
 		previousMessageIndex,
 		isLoading: computed(() => isLoading.value),
 		sendMessage,
+		extractResponseMessage,
+		getChatMessages,
 	};
 }

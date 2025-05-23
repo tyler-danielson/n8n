@@ -1,6 +1,7 @@
 import { renderComponent } from '@/__tests__/render';
 import userEvent from '@testing-library/user-event';
-import { within, waitFor } from '@testing-library/vue';
+import { within } from '@testing-library/vue';
+import { waitFor } from '@testing-library/vue';
 import ParameterOptions from './ParameterOptions.vue';
 import { setActivePinia, createPinia } from 'pinia';
 

@@ -14,8 +14,7 @@ defineOptions({
 const emit = defineEmits<{
 	update: [parameters: Record<string, unknown>];
 	move: [position: XYPosition];
-	activate: [id: string];
-	deactivate: [id: string];
+	dblclick: [event: MouseEvent];
 	'open:contextmenu': [event: MouseEvent];
 }>();
 
@@ -59,20 +58,16 @@ function onInputChange(value: string) {
 	});
 }
 
-function onSetActive(value: boolean) {
-	if (isActive.value === value) return;
+function onEdit(edit: boolean) {
+	isActive.value = edit;
+}
 
-	isActive.value = value;
-
-	if (value) {
-		emit('activate', id.value);
-	} else {
-		emit('deactivate', id.value);
-	}
+function onDoubleClick(event: MouseEvent) {
+	emit('dblclick', event);
 }
 
 function onActivate() {
-	onSetActive(true);
+	onEdit(true);
 }
 
 /**
@@ -88,11 +83,11 @@ function openContextMenu(event: MouseEvent) {
  */
 
 onMounted(() => {
-	eventBus.value?.on('update:node:activated', onActivate);
+	eventBus.value?.on('update:node:active', onActivate);
 });
 
 onBeforeUnmount(() => {
-	eventBus.value?.off('update:node:activated', onActivate);
+	eventBus.value?.off('update:node:active', onActivate);
 });
 </script>
 <template>
@@ -115,8 +110,8 @@ onBeforeUnmount(() => {
 		:background-color="renderOptions.color"
 		:edit-mode="isActive"
 		:read-only="isReadOnly"
-		@edit="onSetActive"
-		@dblclick.stop="onActivate"
+		@edit="onEdit"
+		@dblclick="onDoubleClick"
 		@update:model-value="onInputChange"
 		@contextmenu="openContextMenu"
 	/>

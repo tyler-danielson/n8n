@@ -1,14 +1,13 @@
 import { computed, reactive } from 'vue';
 import { defineStore } from 'pinia';
 import type { CloudPlanState } from '@/Interface';
-import { useRootStore } from '@n8n/stores/useRootStore';
+import { useRootStore } from '@/stores/root.store';
 import { useSettingsStore } from '@/stores/settings.store';
 import { useUIStore } from '@/stores/ui.store';
 import { useUsersStore } from '@/stores/users.store';
 import { getAdminPanelLoginCode, getCurrentPlan, getCurrentUsage } from '@/api/cloudPlans';
 import { DateTime } from 'luxon';
-import { CLOUD_TRIAL_CHECK_INTERVAL } from '@/constants';
-import { STORES } from '@n8n/stores';
+import { CLOUD_TRIAL_CHECK_INTERVAL, STORES } from '@/constants';
 import { hasPermission } from '@/utils/rbac/permissions';
 
 const DEFAULT_STATE: CloudPlanState = {
@@ -168,7 +167,9 @@ export const useCloudPlanStore = defineStore(STORES.CLOUD_PLAN, () => {
 		state.initialized = true;
 	};
 
-	const generateCloudDashboardAutoLoginLink = async (data: { redirectionPath: string }) => {
+	const generateCloudDashboardAutoLoginLink = async (data: {
+		redirectionPath: string;
+	}) => {
 		const searchParams = new URLSearchParams();
 
 		const adminPanelHost = new URL(window.location.href).host.split('.').slice(1).join('.');

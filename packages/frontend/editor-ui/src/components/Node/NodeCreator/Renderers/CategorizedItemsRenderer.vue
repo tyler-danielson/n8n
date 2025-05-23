@@ -10,8 +10,6 @@ import ItemsRenderer from './ItemsRenderer.vue';
 import CategoryItem from '../ItemTypes/CategoryItem.vue';
 import { useNodeCreatorStore } from '@/stores/nodeCreator.store';
 
-import CommunityNodeInstallHint from '../Panel/CommunityNodeInstallHint.vue';
-
 export interface Props {
 	elements: INodeCreateElement[];
 	category: string;
@@ -22,24 +20,18 @@ export interface Props {
 	expanded?: boolean;
 }
 
-import { useI18n } from '@/composables/useI18n';
-
 const props = withDefaults(defineProps<Props>(), {
 	elements: () => [],
 });
 
-const { popViewStack, activeViewStack } = useViewStacks();
+const { popViewStack } = useViewStacks();
 const { registerKeyHook } = useKeyboardNavigation();
 const { workflowId } = useWorkflowsStore();
 const nodeCreatorStore = useNodeCreatorStore();
-const i18n = useI18n();
 
 const activeItemId = computed(() => useKeyboardNavigation()?.activeItemId);
 const actionCount = computed(() => props.elements.filter(({ type }) => type === 'action').length);
 const expanded = ref(props.expanded ?? false);
-const isPreview = computed(
-	() => activeViewStack.communityNodeDetails && !activeViewStack.communityNodeDetails.installed,
-);
 
 function toggleExpanded() {
 	setExpanded(!expanded.value);
@@ -123,18 +115,12 @@ registerKeyHook(`CategoryLeft_${props.category}`, {
 		<div v-if="expanded && actionCount > 0 && $slots.default" :class="$style.contentSlot">
 			<slot />
 		</div>
-		<CommunityNodeInstallHint
-			v-if="isPreview"
-			:hint="i18n.baseText('communityNodeItem.actions.hint')"
-		/>
-
 		<!-- Pass through listeners & empty slot to ItemsRenderer -->
 		<ItemsRenderer
 			v-if="expanded"
 			v-bind="$attrs"
 			:elements="elements"
 			:is-trigger="isTriggerCategory"
-			:class="[{ [$style.preview]: isPreview }]"
 		>
 			<template #default> </template>
 			<template #empty>
@@ -166,10 +152,5 @@ registerKeyHook(`CategoryLeft_${props.category}`, {
 }
 .categorizedItemsRenderer {
 	padding-bottom: var(--spacing-s);
-}
-.preview {
-	opacity: 0.7;
-	pointer-events: none;
-	cursor: default;
 }
 </style>

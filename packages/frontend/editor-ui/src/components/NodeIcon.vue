@@ -1,10 +1,24 @@
 <script setup lang="ts">
 import type { IVersionNode, SimplifiedNodeType } from '@/Interface';
-import { getNodeIconSource, type NodeIconSource } from '@/utils/nodeIcon';
-import { N8nNodeIcon } from '@n8n/design-system';
+import { useRootStore } from '@/stores/root.store';
+import { useUIStore } from '@/stores/ui.store';
+import {
+	getBadgeIconUrl,
+	getNodeIcon,
+	getNodeIconColor,
+	getNodeIconUrl,
+} from '@/utils/nodeTypesUtils';
+import type { INodeTypeDescription } from 'n8n-workflow';
 import { computed } from 'vue';
 
+interface NodeIconSource {
+	path?: string;
+	fileBuffer?: string;
+	icon?: string;
+}
+
 type Props = {
+	nodeType?: INodeTypeDescription | SimplifiedNodeType | IVersionNode | null;
 	size?: number;
 	disabled?: boolean;
 	circle?: boolean;
@@ -12,15 +26,10 @@ type Props = {
 	showTooltip?: boolean;
 	tooltipPosition?: 'top' | 'bottom' | 'left' | 'right';
 	nodeName?: string;
-	// NodeIcon needs iconSource OR nodeType, would be better with an intersection type
-	// but it breaks Vue template type checking
-	iconSource?: NodeIconSource;
-	nodeType?: SimplifiedNodeType | IVersionNode | null;
 };
 
 const props = withDefaults(defineProps<Props>(), {
 	nodeType: undefined,
-	iconSource: undefined,
 	size: undefined,
 	circle: false,
 	disabled: false,
@@ -28,57 +37,97 @@ const props = withDefaults(defineProps<Props>(), {
 	tooltipPosition: 'top',
 	colorDefault: '',
 	nodeName: '',
-	badgeIconUrl: undefined,
 });
 
 const emit = defineEmits<{
 	click: [];
 }>();
 
-const iconSource = computed(() => {
-	if (props.iconSource) return props.iconSource;
-	return getNodeIconSource(props.nodeType);
+const rootStore = useRootStore();
+const uiStore = useUIStore();
+
+const iconType = computed(() => {
+	const nodeType = props.nodeType;
+
+	if (nodeType) {
+		if (nodeType.iconUrl) return 'file';
+		if ('iconData' in nodeType && nodeType.iconData) {
+			return nodeType.iconData.type;
+		}
+		if (nodeType.icon) {
+			const icon = getNodeIcon(nodeType, uiStore.appliedTheme);
+			return icon && icon.split(':')[0] === 'file' ? 'file' : 'icon';
+		}
+	}
+
+	return 'unknown';
 });
 
-const iconType = computed(() => iconSource.value?.type ?? 'unknown');
-const src = computed(() => {
-	if (iconSource.value?.type !== 'file') return;
-	return iconSource.value.src;
-});
+const color = computed(() => getNodeIconColor(props.nodeType) ?? props.colorDefault ?? '');
 
-const iconName = computed(() => {
-	if (iconSource.value?.type !== 'icon') return;
-	return iconSource.value.name;
-});
+const iconSource = computed<NodeIconSource>(() => {
+	const nodeType = props.nodeType;
+	const baseUrl = rootStore.baseUrl;
 
-const iconColor = computed(() => {
-	if (iconSource.value?.type !== 'icon') return;
-	return iconSource.value.color ?? props.colorDefault;
+	if (nodeType) {
+		// If node type has icon data, use it
+		if ('iconData' in nodeType && nodeType.iconData) {
+			return {
+				icon: nodeType.iconData.icon,
+				fileBuffer: nodeType.iconData.fileBuffer,
+			};
+		}
+
+		const iconUrl = getNodeIconUrl(nodeType, uiStore.appliedTheme);
+		if (iconUrl) {
+			return { path: baseUrl + iconUrl };
+		}
+		// Otherwise, extract it from icon prop
+		if (nodeType.icon) {
+			const icon = getNodeIcon(nodeType, uiStore.appliedTheme);
+
+			if (icon) {
+				const [type, path] = icon.split(':');
+				if (type === 'file') {
+					throw new Error(`Unexpected icon: ${icon}`);
+				}
+
+				return { icon: path };
+			}
+		}
+	}
+
+	return {};
 });
 
 const badge = computed(() => {
-	if (iconSource.value?.badge?.type !== 'file') return;
-	return iconSource.value.badge;
-});
+	const nodeType = props.nodeType;
+	if (nodeType && 'badgeIconUrl' in nodeType && nodeType.badgeIconUrl) {
+		return {
+			type: 'file',
+			src: rootStore.baseUrl + getBadgeIconUrl(nodeType, uiStore.appliedTheme),
+		};
+	}
 
-const nodeTypeName = computed(() => props.nodeName ?? props.nodeType?.displayName);
+	return undefined;
+});
 </script>
 
 <template>
-	<N8nNodeIcon
+	<n8n-node-icon
 		:type="iconType"
-		:src="src"
-		:name="iconName"
-		:color="iconColor"
+		:src="iconSource.path || iconSource.fileBuffer"
+		:name="iconSource.icon"
+		:color="color"
 		:disabled="disabled"
 		:size="size"
 		:circle="circle"
-		:node-type-name="nodeTypeName"
+		:node-type-name="nodeName ? nodeName : nodeType?.displayName"
 		:show-tooltip="showTooltip"
 		:tooltip-position="tooltipPosition"
 		:badge="badge"
 		@click="emit('click')"
-	></N8nNodeIcon>
+	></n8n-node-icon>
 </template>
 
 <style lang="scss" module></style>

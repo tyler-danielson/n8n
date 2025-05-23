@@ -1,18 +1,19 @@
 <script setup lang="ts">
-import KeyboardShortcutTooltip from '@/components/KeyboardShortcutTooltip.vue';
-import TidyUpIcon from '@/components/TidyUpIcon.vue';
-import { useI18n } from '@/composables/useI18n';
 import { Controls } from '@vue-flow/controls';
+import KeyboardShortcutTooltip from '@/components/KeyboardShortcutTooltip.vue';
 import { computed } from 'vue';
+import { useBugReporting } from '@/composables/useBugReporting';
+import { useTelemetry } from '@/composables/useTelemetry';
+import { useI18n } from '@/composables/useI18n';
 
 const props = withDefaults(
 	defineProps<{
 		zoom?: number;
-		readOnly?: boolean;
+		showBugReportingButton?: boolean;
 	}>(),
 	{
 		zoom: 1,
-		readOnly: false,
+		showBugReportingButton: false,
 	},
 );
 
@@ -21,9 +22,10 @@ const emit = defineEmits<{
 	'zoom-in': [];
 	'zoom-out': [];
 	'zoom-to-fit': [];
-	'tidy-up': [];
 }>();
 
+const { getReportingURL } = useBugReporting();
+const telemetry = useTelemetry();
 const i18n = useI18n();
 
 const isResetZoomVisible = computed(() => props.zoom !== 1);
@@ -44,8 +46,8 @@ function onZoomToFit() {
 	emit('zoom-to-fit');
 }
 
-function onTidyUp() {
-	emit('tidy-up');
+function trackBugReport() {
+	telemetry.track('User clicked bug report button in canvas', {}, { withPostHog: true });
 }
 </script>
 <template>
@@ -94,35 +96,15 @@ function onTidyUp() {
 			/>
 		</KeyboardShortcutTooltip>
 		<KeyboardShortcutTooltip
-			v-if="!readOnly"
-			:label="i18n.baseText('nodeView.tidyUp')"
-			:shortcut="{ shiftKey: true, altKey: true, keys: ['T'] }"
+			v-if="props.showBugReportingButton"
+			:label="i18n.baseText('nodeView.reportBug')"
 		>
-			<N8nButton
-				square
-				type="tertiary"
-				size="large"
-				data-test-id="tidy-up-button"
-				:class="$style.iconButton"
-				@click="onTidyUp"
-			>
-				<TidyUpIcon />
-			</N8nButton>
+			<a :href="getReportingURL()" target="_blank" @click="trackBugReport">
+				<N8nIconButton type="tertiary" size="large" icon="bug" data-test-id="report-bug" />
+			</a>
 		</KeyboardShortcutTooltip>
 	</Controls>
 </template>
-
-<style module lang="scss">
-.iconButton {
-	padding-left: 0;
-	padding-right: 0;
-
-	svg {
-		width: 16px;
-		height: 16px;
-	}
-}
-</style>
 
 <style lang="scss">
 .vue-flow__controls {

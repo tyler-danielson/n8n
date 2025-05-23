@@ -1,11 +1,10 @@
-import type { ActionDropdownItem, XYPosition, INodeUi } from '@/Interface';
+import type { ActionDropdownItem, XYPosition } from '@/Interface';
 import { NOT_DUPLICATABLE_NODE_TYPES, STICKY_NODE_TYPE } from '@/constants';
 import { useNodeTypesStore } from '@/stores/nodeTypes.store';
 import { useSourceControlStore } from '@/stores/sourceControl.store';
 import { useUIStore } from '@/stores/ui.store';
 import { useWorkflowsStore } from '@/stores/workflows.store';
 import type { INode, INodeTypeDescription } from 'n8n-workflow';
-import { NodeHelpers } from 'n8n-workflow';
 import { computed, ref, watch } from 'vue';
 import { getMousePosition } from '../utils/nodeViewUtils';
 import { useI18n } from './useI18n';
@@ -14,7 +13,7 @@ import { isPresent } from '../utils/typesUtils';
 import { getResourcePermissions } from '@/permissions';
 
 export type ContextMenuTarget =
-	| { source: 'canvas'; nodeIds: string[]; nodeId?: string }
+	| { source: 'canvas'; nodeIds: string[] }
 	| { source: 'node-right-click'; nodeId: string }
 	| { source: 'node-button'; nodeId: string };
 export type ContextMenuActionCallback = (action: ContextMenuAction, nodeIds: string[]) => void;
@@ -32,9 +31,7 @@ export type ContextMenuAction =
 	| 'deselect_all'
 	| 'add_node'
 	| 'add_sticky'
-	| 'change_color'
-	| 'open_sub_workflow'
-	| 'tidy_up';
+	| 'change_color';
 
 const position = ref<XYPosition>([0, 0]);
 const isOpen = ref(false);
@@ -58,19 +55,8 @@ export const useContextMenu = (onAction: ContextMenuActionCallback = () => {}) =
 		() =>
 			sourceControlStore.preferences.branchReadOnly ||
 			uiStore.isReadOnlyView ||
-			!workflowPermissions.value.update ||
-			workflowsStore.workflow.isArchived,
+			!workflowPermissions.value.update,
 	);
-
-	const canOpenSubworkflow = computed(() => {
-		if (targetNodes.value.length !== 1) return false;
-
-		const node = targetNodes.value[0];
-
-		if (!NodeHelpers.isNodeWithWorkflowSelector(node)) return false;
-
-		return !!NodeHelpers.getSubworkflowId(node);
-	});
 
 	const targetNodeIds = computed(() => {
 		if (!isOpen.value || !target.value) return [];
@@ -107,24 +93,10 @@ export const useContextMenu = (onAction: ContextMenuActionCallback = () => {}) =
 		position.value = [0, 0];
 	};
 
-	const isExecutable = (node: INodeUi) => {
-		const currentWorkflow = workflowsStore.getCurrentWorkflow();
-		const workflowNode = currentWorkflow.getNode(node.name) as INode;
-		const nodeType = nodeTypesStore.getNodeType(
-			workflowNode.type,
-			workflowNode.typeVersion,
-		) as INodeTypeDescription;
-		return NodeHelpers.isExecutable(currentWorkflow, workflowNode, nodeType);
-	};
-
 	const open = (event: MouseEvent, menuTarget: ContextMenuTarget) => {
 		event.stopPropagation();
 
-		if (
-			isOpen.value &&
-			menuTarget.source === target.value?.source &&
-			menuTarget.nodeId === target.value?.nodeId
-		) {
+		if (isOpen.value && menuTarget.source === target.value?.source) {
 			// Close context menu, let browser open native context menu
 			close();
 			return;
@@ -139,7 +111,6 @@ export const useContextMenu = (onAction: ContextMenuActionCallback = () => {}) =
 
 		const nodes = targetNodes.value;
 		const onlyStickies = nodes.every((node) => node.type === STICKY_NODE_TYPE);
-
 		const i18nOptions = {
 			adjustToNumber: nodes.length,
 			interpolate: {
@@ -149,7 +120,7 @@ export const useContextMenu = (onAction: ContextMenuActionCallback = () => {}) =
 			},
 		};
 
-		const selectionActions: ActionDropdownItem[] = [
+		const selectionActions = [
 			{
 				id: 'select_all',
 				divided: true,
@@ -161,17 +132,6 @@ export const useContextMenu = (onAction: ContextMenuActionCallback = () => {}) =
 				id: 'deselect_all',
 				label: i18n.baseText('contextMenu.deselectAll'),
 				disabled: nodes.length === 0,
-			},
-		];
-
-		const layoutActions: ActionDropdownItem[] = [
-			{
-				id: 'tidy_up',
-				divided: true,
-				label: i18n.baseText(
-					nodes.length < 2 ? 'contextMenu.tidyUpWorkflow' : 'contextMenu.tidyUpSelection',
-				),
-				shortcut: { shiftKey: true, altKey: true, keys: ['T'] },
 			},
 		];
 
@@ -189,7 +149,6 @@ export const useContextMenu = (onAction: ContextMenuActionCallback = () => {}) =
 					label: i18n.baseText('contextMenu.addSticky'),
 					disabled: isReadOnly.value,
 				},
-				...layoutActions,
 				...selectionActions,
 			];
 		} else {
@@ -221,7 +180,6 @@ export const useContextMenu = (onAction: ContextMenuActionCallback = () => {}) =
 					shortcut: { metaKey: true, keys: ['D'] },
 					disabled: isReadOnly.value || !nodes.every(canDuplicateNode),
 				},
-				...layoutActions,
 				...selectionActions,
 				{
 					id: 'delete',
@@ -233,7 +191,7 @@ export const useContextMenu = (onAction: ContextMenuActionCallback = () => {}) =
 			].filter(Boolean) as ActionDropdownItem[];
 
 			if (nodes.length === 1) {
-				const singleNodeActions: ActionDropdownItem[] = onlyStickies
+				const singleNodeActions = onlyStickies
 					? [
 							{
 								id: 'open',
@@ -256,24 +214,15 @@ export const useContextMenu = (onAction: ContextMenuActionCallback = () => {}) =
 							{
 								id: 'execute',
 								label: i18n.baseText('contextMenu.test'),
-								disabled: isReadOnly.value || !isExecutable(nodes[0]),
+								disabled: isReadOnly.value,
 							},
 							{
 								id: 'rename',
 								label: i18n.baseText('contextMenu.rename'),
-								shortcut: { keys: ['Space'] },
+								shortcut: { keys: ['F2'] },
 								disabled: isReadOnly.value,
 							},
 						];
-
-				if (NodeHelpers.isNodeWithWorkflowSelector(nodes[0])) {
-					singleNodeActions.push({
-						id: 'open_sub_workflow',
-						label: i18n.baseText('contextMenu.openSubworkflow'),
-						shortcut: { shiftKey: true, metaKey: true, keys: ['O'] },
-						disabled: !canOpenSubworkflow.value,
-					});
-				}
 				// Add actions only available for a single node
 				menuActions.unshift(...singleNodeActions);
 			}

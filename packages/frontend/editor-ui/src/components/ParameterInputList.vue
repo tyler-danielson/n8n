@@ -5,19 +5,18 @@ import type {
 	NodeParameterValue,
 	NodeParameterValueType,
 } from 'n8n-workflow';
-import { ADD_FORM_NOTICE, deepCopy, NodeHelpers } from 'n8n-workflow';
-import { computed, defineAsyncComponent, onErrorCaptured, ref, watch, type WatchSource } from 'vue';
+import { deepCopy, ADD_FORM_NOTICE } from 'n8n-workflow';
+import { computed, defineAsyncComponent, onErrorCaptured, ref, watch } from 'vue';
 
 import type { IUpdateInformation } from '@/Interface';
 
 import AssignmentCollection from '@/components/AssignmentCollection/AssignmentCollection.vue';
-import ButtonParameter from '@/components/ButtonParameter/ButtonParameter.vue';
 import FilterConditions from '@/components/FilterConditions/FilterConditions.vue';
 import ImportCurlParameter from '@/components/ImportCurlParameter.vue';
 import MultipleParameter from '@/components/MultipleParameter.vue';
+import ButtonParameter from '@/components/ButtonParameter/ButtonParameter.vue';
 import ParameterInputFull from '@/components/ParameterInputFull.vue';
 import ResourceMapper from '@/components/ResourceMapper/ResourceMapper.vue';
-import { useI18n } from '@/composables/useI18n';
 import { useNodeHelpers } from '@/composables/useNodeHelpers';
 import { useWorkflowHelpers } from '@/composables/useWorkflowHelpers';
 import {
@@ -28,17 +27,16 @@ import {
 } from '@/constants';
 import { useNDVStore } from '@/stores/ndv.store';
 import { useNodeTypesStore } from '@/stores/nodeTypes.store';
-
 import {
 	getMainAuthField,
 	getNodeAuthFields,
 	isAuthRelatedParameter,
 } from '@/utils/nodeTypesUtils';
-import { captureException } from '@sentry/vue';
-import { computedWithControl } from '@vueuse/core';
 import { get, set } from 'lodash-es';
-import { N8nIcon, N8nIconButton, N8nInputLabel, N8nNotice, N8nText } from '@n8n/design-system';
 import { useRouter } from 'vue-router';
+import { captureException } from '@sentry/vue';
+import { N8nNotice, N8nIconButton, N8nInputLabel, N8nText, N8nIcon } from 'n8n-design-system';
+import { useI18n } from '@/composables/useI18n';
 
 const LazyFixedCollectionParameter = defineAsyncComponent(
 	async () => await import('./FixedCollectionParameter.vue'),
@@ -46,9 +44,6 @@ const LazyFixedCollectionParameter = defineAsyncComponent(
 const LazyCollectionParameter = defineAsyncComponent(
 	async () => await import('./CollectionParameter.vue'),
 );
-
-// Parameter issues are displayed within the inputs themselves, but some parameters need to show them in the label UI
-const showIssuesInLabelFor = ['fixedCollection'];
 
 type Props = {
 	nodeValues: INodeParameters;
@@ -103,34 +98,22 @@ const nodeType = computed(() => {
 	return null;
 });
 
-const filteredParameters = computedWithControl(
-	[() => props.parameters, () => props.nodeValues] as WatchSource[],
-	() => {
-		const parameters = props.parameters.filter((parameter: INodeProperties) =>
-			displayNodeParameter(parameter),
-		);
+const filteredParameters = computed(() => {
+	const parameters = props.parameters.filter((parameter: INodeProperties) =>
+		displayNodeParameter(parameter),
+	);
 
-		const activeNode = ndvStore.activeNode;
+	const activeNode = ndvStore.activeNode;
 
-		if (activeNode && activeNode.type === FORM_TRIGGER_NODE_TYPE) {
-			return updateFormTriggerParameters(parameters, activeNode.name);
-		}
+	if (activeNode && activeNode.type === FORM_TRIGGER_NODE_TYPE) {
+		return updateFormTriggerParameters(parameters, activeNode.name);
+	}
+	if (activeNode && activeNode.type === WAIT_NODE_TYPE && activeNode.parameters.resume === 'form') {
+		return updateWaitParameters(parameters, activeNode.name);
+	}
 
-		if (activeNode && activeNode.type === FORM_NODE_TYPE) {
-			return updateFormParameters(parameters, activeNode.name);
-		}
-
-		if (
-			activeNode &&
-			activeNode.type === WAIT_NODE_TYPE &&
-			activeNode.parameters.resume === 'form'
-		) {
-			return updateWaitParameters(parameters, activeNode.name);
-		}
-
-		return parameters;
-	},
-);
+	return parameters;
+});
 
 const filteredParameterNames = computed(() => {
 	return filteredParameters.value.map((parameter) => parameter.name);
@@ -269,19 +252,6 @@ function updateWaitParameters(parameters: INodeProperties[], nodeName: string) {
 		}
 		return waitNodeParameters;
 	}
-
-	return parameters;
-}
-
-function updateFormParameters(parameters: INodeProperties[], nodeName: string) {
-	const workflow = workflowHelpers.getCurrentWorkflow();
-	const parentNodes = workflow.getParentNodes(nodeName);
-
-	const formTriggerName = parentNodes.find(
-		(node) => workflow.nodes[node].type === FORM_TRIGGER_NODE_TYPE,
-	);
-
-	if (formTriggerName) return parameters.filter((parameter) => parameter.name !== 'triggerNotice');
 
 	return parameters;
 }
@@ -462,21 +432,6 @@ function onNoticeAction(action: string) {
 	}
 }
 
-function getParameterIssues(parameter: INodeProperties): string[] {
-	if (!node.value || !showIssuesInLabelFor.includes(parameter.type)) {
-		return [];
-	}
-	const issues = NodeHelpers.getParameterIssues(
-		parameter,
-		node.value.parameters,
-		'',
-		node.value,
-		nodeType.value,
-	);
-
-	return issues.parameters?.[parameter.name] ?? [];
-}
-
 /**
  * Handles default node button parameter type actions
  * @param parameter
@@ -581,26 +536,8 @@ function getParameterValue<T extends NodeParameterValueType = NodeParameterValue
 					:tooltip-text="i18n.nodeText().inputLabelDescription(parameter, path)"
 					size="small"
 					:underline="true"
-					:input-name="parameter.name"
 					color="text-dark"
-				>
-					<template
-						v-if="
-							showIssuesInLabelFor.includes(parameter.type) &&
-							getParameterIssues(parameter).length > 0
-						"
-						#issues
-					>
-						<N8nTooltip>
-							<template #content>
-								<span v-for="(issue, i) in getParameterIssues(parameter)" :key="i">{{
-									issue
-								}}</span>
-							</template>
-							<N8nIcon icon="exclamation-triangle" size="small" color="danger" />
-						</N8nTooltip>
-					</template>
-				</N8nInputLabel>
+				/>
 				<Suspense v-if="!asyncLoadingError">
 					<template #default>
 						<LazyCollectionParameter
@@ -671,11 +608,12 @@ function getParameterValue<T extends NodeParameterValueType = NodeParameterValue
 				:path="getPath(parameter.name)"
 				:node="node"
 				:is-read-only="isReadOnly"
-				:default-type="parameter.typeOptions?.assignment?.defaultType"
-				:disable-type="parameter.typeOptions?.assignment?.disableType"
 				@value-changed="valueChanged"
 			/>
-			<div v-else-if="credentialsParameterIndex !== index" class="parameter-item">
+			<div
+				v-else-if="displayNodeParameter(parameter) && credentialsParameterIndex !== index"
+				class="parameter-item"
+			>
 				<N8nIconButton
 					v-if="hideDelete !== true && !isReadOnly && !parameter.isNodeSetting"
 					type="tertiary"

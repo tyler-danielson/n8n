@@ -6,7 +6,6 @@ import {
 	MODAL_CONFIRM,
 	FORM_TRIGGER_NODE_TYPE,
 	CHAT_TRIGGER_NODE_TYPE,
-	FROM_AI_PARAMETERS_MODAL_KEY,
 } from '@/constants';
 import {
 	AI_TRANSFORM_CODE_GENERATED_FOR_PROMPT,
@@ -23,13 +22,12 @@ import { useExternalHooks } from '@/composables/useExternalHooks';
 import { nodeViewEventBus } from '@/event-bus';
 import { usePinnedData } from '@/composables/usePinnedData';
 import { useRunWorkflow } from '@/composables/useRunWorkflow';
+import { useUIStore } from '@/stores/ui.store';
 import { useRouter } from 'vue-router';
 import { useI18n } from '@/composables/useI18n';
 import { useTelemetry } from '@/composables/useTelemetry';
-import { type IUpdateInformation } from '@/Interface';
+import { type IUpdateInformation } from '../Interface';
 import { generateCodeForAiTransform } from '@/components/ButtonParameter/utils';
-import { needsAgentInput } from '@/utils/nodes/nodeTransforms';
-import { useUIStore } from '@/stores/ui.store';
 
 const NODE_TEST_STEP_POPUP_COUNT_KEY = 'N8N_NODE_TEST_STEP_POPUP_COUNT';
 const MAX_POPUP_COUNT = 10;
@@ -74,10 +72,10 @@ const externalHooks = useExternalHooks();
 const toast = useToast();
 const ndvStore = useNDVStore();
 const nodeTypesStore = useNodeTypesStore();
+const uiStore = useUIStore();
 const i18n = useI18n();
 const message = useMessage();
 const telemetry = useTelemetry();
-const uiStore = useUIStore();
 
 const node = computed(() => workflowsStore.getNodeByName(props.nodeName));
 const pinnedData = usePinnedData(node);
@@ -87,7 +85,7 @@ const nodeType = computed((): INodeTypeDescription | null => {
 });
 
 const isNodeRunning = computed(() => {
-	if (!workflowsStore.isWorkflowRunning || codeGenerationInProgress.value) return false;
+	if (!uiStore.isActionActive['workflowRunning'] || codeGenerationInProgress.value) return false;
 	const triggeredNode = workflowsStore.executedNode;
 	return (
 		workflowsStore.isNodeExecuting(node.value?.name ?? '') || triggeredNode === node.value?.name
@@ -97,6 +95,8 @@ const isNodeRunning = computed(() => {
 const isTriggerNode = computed(() => {
 	return node.value ? nodeTypesStore.isTriggerNode(node.value.type) : false;
 });
+
+const isWorkflowRunning = computed(() => uiStore.isActionActive.workflowRunning);
 
 const isManualTriggerNode = computed(() =>
 	nodeType.value ? nodeType.value.name === MANUAL_TRIGGER_NODE_TYPE : false,
@@ -155,7 +155,7 @@ const disabledHint = computed(() => {
 		return i18n.baseText('ndv.execute.generatingCode');
 	}
 
-	if (node?.value?.disabled) {
+	if (isTriggerNode.value && node?.value?.disabled) {
 		return i18n.baseText('ndv.execute.nodeIsDisabled');
 	}
 
@@ -168,7 +168,7 @@ const disabledHint = computed(() => {
 		return i18n.baseText('ndv.execute.requiredFieldsMissing');
 	}
 
-	if (workflowsStore.isWorkflowRunning && !isNodeRunning.value) {
+	if (isWorkflowRunning.value && !isNodeRunning.value) {
 		return i18n.baseText('ndv.execute.workflowAlreadyRunning');
 	}
 
@@ -319,7 +319,6 @@ async function onClick() {
 
 	if (isChatNode.value || (isChatChild.value && ndvStore.isInputPanelEmpty)) {
 		ndvStore.setActiveNodeName(null);
-		workflowsStore.chatPartialExecutionDestinationNode = props.nodeName;
 		nodeViewEventBus.emit('openChat');
 	} else if (isListeningForEvents.value) {
 		await stopWaitingForWebhook();
@@ -345,52 +344,50 @@ async function onClick() {
 		}
 
 		if (!pinnedData.hasData.value || shouldUnpinAndExecute) {
-			if (node.value && needsAgentInput(node.value)) {
-				uiStore.openModalWithData({
-					name: FROM_AI_PARAMETERS_MODAL_KEY,
-					data: {
-						nodeName: props.nodeName,
-					},
-				});
-			} else {
-				const telemetryPayload = {
-					node_type: nodeType.value ? nodeType.value.name : null,
-					workflow_id: workflowsStore.workflowId,
-					source: props.telemetrySource,
-					push_ref: ndvStore.pushRef,
-				};
+			const telemetryPayload = {
+				node_type: nodeType.value ? nodeType.value.name : null,
+				workflow_id: workflowsStore.workflowId,
+				source: props.telemetrySource,
+				push_ref: ndvStore.pushRef,
+			};
 
-				telemetry.track('User clicked execute node button', telemetryPayload);
-				await externalHooks.run('nodeExecuteButton.onClick', telemetryPayload);
+			telemetry.track('User clicked execute node button', telemetryPayload);
+			await externalHooks.run('nodeExecuteButton.onClick', telemetryPayload);
 
-				await runWorkflow({
-					destinationNode: props.nodeName,
-					source: 'RunData.ExecuteNodeButton',
-				});
+			await runWorkflow({
+				destinationNode: props.nodeName,
+				source: 'RunData.ExecuteNodeButton',
+			});
 
-				emit('execute');
-			}
+			emit('execute');
 		}
 	}
 }
 </script>
 
 <template>
-	<N8nTooltip placement="right" :disabled="!tooltipText" :content="tooltipText">
-		<N8nButton
-			v-bind="$attrs"
-			:loading="isLoading"
-			:disabled="disabled || !!disabledHint"
-			:label="buttonLabel"
-			:type="type"
-			:size="size"
-			:icon="buttonIcon"
-			:transparent-background="transparent"
-			:title="
-				!isTriggerNode && !tooltipText ? i18n.baseText('ndv.execute.testNode.description') : ''
-			"
-			@mouseover="onMouseOver"
-			@click="onClick"
-		/>
-	</N8nTooltip>
+	<div>
+		<n8n-tooltip placement="right" :disabled="!tooltipText">
+			<template #content>
+				<div>{{ tooltipText }}</div>
+			</template>
+			<div>
+				<n8n-button
+					v-bind="$attrs"
+					:loading="isLoading"
+					:disabled="disabled || !!disabledHint"
+					:label="buttonLabel"
+					:type="type"
+					:size="size"
+					:icon="buttonIcon"
+					:transparent-background="transparent"
+					:title="
+						!isTriggerNode && !tooltipText ? i18n.baseText('ndv.execute.testNode.description') : ''
+					"
+					@mouseover="onMouseOver"
+					@click="onClick"
+				/>
+			</div>
+		</n8n-tooltip>
+	</div>
 </template>

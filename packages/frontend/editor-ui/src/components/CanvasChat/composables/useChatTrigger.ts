@@ -1,29 +1,39 @@
-import type { ComputedRef } from 'vue';
-import { computed } from 'vue';
+import type { ComputedRef, MaybeRef } from 'vue';
+import { ref, computed, unref } from 'vue';
 import {
 	CHAIN_SUMMARIZATION_LANGCHAIN_NODE_TYPE,
-	NodeConnectionTypes,
+	NodeConnectionType,
 	NodeHelpers,
 } from 'n8n-workflow';
-import type { INodeTypeDescription, Workflow, INodeParameters } from 'n8n-workflow';
+import type { INodeTypeDescription, Workflow, INode, INodeParameters } from 'n8n-workflow';
 import {
 	AI_CATEGORY_AGENTS,
 	AI_CATEGORY_CHAINS,
 	AI_CODE_NODE_TYPE,
 	AI_SUBCATEGORY,
+	CHAT_TRIGGER_NODE_TYPE,
+	MANUAL_CHAT_TRIGGER_NODE_TYPE,
 } from '@/constants';
 import type { INodeUi } from '@/Interface';
-import { isChatNode } from '@/components/CanvasChat/utils';
 
 export interface ChatTriggerDependencies {
 	getNodeByName: (name: string) => INodeUi | null;
 	getNodeType: (type: string, version: number) => INodeTypeDescription | null;
+	canvasNodes: MaybeRef<INodeUi[]>;
 	workflow: ComputedRef<Workflow>;
 }
 
-export function useChatTrigger({ getNodeByName, getNodeType, workflow }: ChatTriggerDependencies) {
-	const chatTriggerNode = computed(
-		() => Object.values(workflow.value.nodes).find(isChatNode) ?? null,
+export function useChatTrigger({
+	getNodeByName,
+	getNodeType,
+	canvasNodes,
+	workflow,
+}: ChatTriggerDependencies) {
+	const chatTriggerName = ref<string | null>(null);
+	const connectedNode = ref<INode | null>(null);
+
+	const chatTriggerNode = computed(() =>
+		chatTriggerName.value ? getNodeByName(chatTriggerName.value) : null,
 	);
 
 	const allowFileUploads = computed(() => {
@@ -40,12 +50,24 @@ export function useChatTrigger({ getNodeByName, getNodeType, workflow }: ChatTri
 		);
 	});
 
+	/** Gets the chat trigger node from the workflow */
+	function setChatTriggerNode() {
+		const triggerNode = unref(canvasNodes).find((node) =>
+			[CHAT_TRIGGER_NODE_TYPE, MANUAL_CHAT_TRIGGER_NODE_TYPE].includes(node.type),
+		);
+
+		if (!triggerNode) {
+			return;
+		}
+		chatTriggerName.value = triggerNode.name;
+	}
+
 	/** Sets the connected node after finding the trigger */
-	const connectedNode = computed(() => {
+	function setConnectedNode() {
 		const triggerNode = chatTriggerNode.value;
 
 		if (!triggerNode) {
-			return null;
+			return;
 		}
 
 		const chatChildren = workflow.value.getChildNodes(triggerNode.name);
@@ -81,9 +103,9 @@ export function useChatTrigger({ getNodeByName, getNodeType, workflow }: ChatTri
 
 					// Validate if node has required AI connection types
 					if (
-						inputTypes.includes(NodeConnectionTypes.AiLanguageModel) &&
-						inputTypes.includes(NodeConnectionTypes.Main) &&
-						outputTypes.includes(NodeConnectionTypes.Main)
+						inputTypes.includes(NodeConnectionType.AiLanguageModel) &&
+						inputTypes.includes(NodeConnectionType.Main) &&
+						outputTypes.includes(NodeConnectionType.Main)
 					) {
 						isCustomChainOrAgent = true;
 					}
@@ -102,14 +124,15 @@ export function useChatTrigger({ getNodeByName, getNodeType, workflow }: ChatTri
 				const result = Boolean(isChatChild && (isAgent || isChain || isCustomChainOrAgent));
 				return result;
 			});
-
-		return chatRootNode ?? null;
-	});
+		connectedNode.value = chatRootNode ?? null;
+	}
 
 	return {
 		allowFileUploads,
 		allowedFilesMimeTypes,
 		chatTriggerNode,
-		connectedNode,
+		connectedNode: computed(() => connectedNode.value),
+		setChatTriggerNode,
+		setConnectedNode,
 	};
 }

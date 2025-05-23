@@ -132,9 +132,9 @@ describe('NodeErrorView.vue', () => {
 		);
 	});
 
-	it('renders stack trace if showDetails is set to true', () => {
+	it('renders stack trace', () => {
 		const { getByText } = renderComponent({
-			props: { error, showDetails: true },
+			props: { error },
 		});
 		expect(getByText('Test stack trace')).toBeTruthy();
 	});

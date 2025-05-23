@@ -2,27 +2,28 @@ import { chatWithAssistant, replaceCode } from '@/api/ai';
 import {
 	VIEWS,
 	EDITABLE_CANVAS_VIEWS,
+	STORES,
+	AI_ASSISTANT_EXPERIMENT,
 	PLACEHOLDER_EMPTY_WORKFLOW_ID,
 	CREDENTIAL_EDIT_MODAL_KEY,
-	ASK_AI_SLIDE_OUT_DURATION_MS,
 } from '@/constants';
-import { STORES } from '@n8n/stores';
 import type { ChatRequest } from '@/types/assistant.types';
-import type { ChatUI } from '@n8n/design-system/types/assistant';
+import type { ChatUI } from 'n8n-design-system/types/assistant';
 import { defineStore } from 'pinia';
 import type { PushPayload } from '@n8n/api-types';
 import { computed, h, ref, watch } from 'vue';
-import { useRootStore } from '@n8n/stores/useRootStore';
+import { useRootStore } from './root.store';
 import { useUsersStore } from './users.store';
 import { useRoute } from 'vue-router';
 import { useSettingsStore } from './settings.store';
-import { assert } from '@n8n/utils/assert';
+import { assert } from '@/utils/assert';
 import { useWorkflowsStore } from './workflows.store';
 import type { ICredentialType, INodeParameters, NodeError, INode } from 'n8n-workflow';
 import { deepCopy } from 'n8n-workflow';
 import { ndvEventBus, codeNodeEditorEventBus } from '@/event-bus';
 import { useNDVStore } from './ndv.store';
 import type { IUpdateInformation } from '@/Interface';
+import { usePostHog } from './posthog.store';
 import { useI18n } from '@/composables/useI18n';
 import { useTelemetry } from '@/composables/useTelemetry';
 import { useToast } from '@/composables/useToast';
@@ -32,7 +33,7 @@ import { useCredentialsStore } from './credentials.store';
 import { useAIAssistantHelpers } from '@/composables/useAIAssistantHelpers';
 
 export const MAX_CHAT_WIDTH = 425;
-export const MIN_CHAT_WIDTH = 300;
+export const MIN_CHAT_WIDTH = 250;
 export const DEFAULT_CHAT_WIDTH = 330;
 export const ENABLED_VIEWS = [
 	...EDITABLE_CANVAS_VIEWS,
@@ -59,6 +60,7 @@ export const useAssistantStore = defineStore(STORES.ASSISTANT, () => {
 	const route = useRoute();
 	const streaming = ref<boolean>();
 	const ndvStore = useNDVStore();
+	const { getVariant } = usePostHog();
 	const locale = useI18n();
 	const telemetry = useTelemetry();
 	const assistantHelpers = useAIAssistantHelpers();
@@ -75,7 +77,7 @@ export const useAssistantStore = defineStore(STORES.ASSISTANT, () => {
 	const chatSessionCredType = ref<ICredentialType | undefined>();
 	const chatSessionError = ref<ChatRequest.ErrorContext | undefined>();
 	const currentSessionId = ref<string | undefined>();
-	const currentSessionActiveExecutionId = ref<string | undefined>(undefined);
+	const currentSessionActiveExecutionId = ref<string | undefined>();
 	const currentSessionWorkflowId = ref<string | undefined>();
 	const lastUnread = ref<ChatUI.AssistantMessage | undefined>();
 	const nodeExecutionStatus = ref<NodeExecutionStatus>('not_executed');
@@ -86,6 +88,10 @@ export const useAssistantStore = defineStore(STORES.ASSISTANT, () => {
 	// Indicate if last sent workflow and execution data is stale
 	const workflowDataStale = ref<boolean>(true);
 	const workflowExecutionDataStale = ref<boolean>(true);
+
+	const isExperimentEnabled = computed(
+		() => getVariant(AI_ASSISTANT_EXPERIMENT.name) === AI_ASSISTANT_EXPERIMENT.variant,
+	);
 
 	const assistantMessages = computed(() =>
 		chatMessages.value.filter((msg) => msg.role === 'assistant'),
@@ -104,7 +110,9 @@ export const useAssistantStore = defineStore(STORES.ASSISTANT, () => {
 
 	const isAssistantOpen = computed(() => canShowAssistant.value && chatWindowOpen.value);
 
-	const isAssistantEnabled = computed(() => settings.isAiAssistantEnabled);
+	const isAssistantEnabled = computed(
+		() => isExperimentEnabled.value && settings.isAiAssistantEnabled,
+	);
 
 	const canShowAssistant = computed(
 		() => isAssistantEnabled.value && ENABLED_VIEWS.includes(route.name as VIEWS),
@@ -139,26 +147,19 @@ export const useAssistantStore = defineStore(STORES.ASSISTANT, () => {
 	function openChat() {
 		chatWindowOpen.value = true;
 		chatMessages.value = chatMessages.value.map((msg) => ({ ...msg, read: true }));
-		uiStore.appGridDimensions = {
-			...uiStore.appGridDimensions,
-			width: window.innerWidth - chatWidth.value,
-		};
+		uiStore.appGridWidth = window.innerWidth - chatWidth.value;
 	}
 
 	function closeChat() {
 		chatWindowOpen.value = false;
 		// Looks smoother if we wait for slide animation to finish before updating the grid width
-		// Has to wait for longer than SlideTransition duration
 		setTimeout(() => {
-			uiStore.appGridDimensions = {
-				...uiStore.appGridDimensions,
-				width: window.innerWidth,
-			};
+			uiStore.appGridWidth = window.innerWidth;
 			// If session has ended, reset the chat
 			if (isSessionEnded.value) {
 				resetAssistantChat();
 			}
-		}, ASK_AI_SLIDE_OUT_DURATION_MS + 50);
+		}, 200);
 	}
 
 	function addAssistantMessages(newMessages: ChatRequest.MessageResponse[], id: string) {
@@ -282,7 +283,7 @@ export const useAssistantStore = defineStore(STORES.ASSISTANT, () => {
 		stopStreaming();
 		assistantThinkingMessage.value = undefined;
 		addAssistantError(
-			locale.baseText('aiAssistant.serviceError.message', { interpolate: { message: e.message } }),
+			`${locale.baseText('aiAssistant.serviceError.message')}: (${e.message})`,
 			id,
 			retry,
 		);
@@ -486,25 +487,24 @@ export const useAssistantStore = defineStore(STORES.ASSISTANT, () => {
 		openChat();
 
 		streaming.value = true;
-		const payload: ChatRequest.RequestPayload['payload'] = {
-			role: 'user',
-			type: 'init-error-helper',
-			user: {
-				firstName: usersStore.currentUser?.firstName ?? '',
-			},
-			error: context.error,
-			node: assistantHelpers.processNodeForAssistant(context.node, [
-				'position',
-				'parameters.notice',
-			]),
-			nodeInputData,
-			executionSchema: schemas,
-			authType,
-		};
 		chatWithAssistant(
 			rootStore.restApiContext,
 			{
-				payload,
+				payload: {
+					role: 'user',
+					type: 'init-error-helper',
+					user: {
+						firstName: usersStore.currentUser?.firstName ?? '',
+					},
+					error: context.error,
+					node: assistantHelpers.processNodeForAssistant(context.node, [
+						'position',
+						'parameters.notice',
+					]),
+					nodeInputData,
+					executionSchema: schemas,
+					authType,
+				},
 			},
 			(msg) => onEachStreamingMessage(msg, id),
 			() => onDoneStreaming(id),
@@ -808,11 +808,11 @@ export const useAssistantStore = defineStore(STORES.ASSISTANT, () => {
 	);
 
 	watch(
-		() => workflowsStore.workflowExecutionResultDataLastUpdate,
+		() => workflowsStore.workflowExecutionData?.data?.resultData ?? {},
 		() => {
 			workflowExecutionDataStale.value = true;
 		},
-		{ immediate: true },
+		{ deep: true, immediate: true },
 	);
 
 	return {

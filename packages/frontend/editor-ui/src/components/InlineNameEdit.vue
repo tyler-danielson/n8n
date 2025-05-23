@@ -5,25 +5,11 @@ import { onClickOutside } from '@vueuse/core';
 
 interface Props {
 	modelValue: string;
-	subtitle?: string;
+	subtitle: string;
 	type: string;
-	readonly?: boolean;
-	placeholder?: string;
-	maxlength?: number;
-	required?: boolean;
-	autosize?: boolean | { minRows: number; maxRows: number };
-	inputType?: string;
-	maxHeight?: string;
+	readonly: boolean;
 }
-const props = withDefaults(defineProps<Props>(), {
-	placeholder: '',
-	maxlength: 64,
-	required: true,
-	autosize: false,
-	inputType: 'text',
-	maxHeight: '22px',
-	subtitle: '',
-});
+const props = defineProps<Props>();
 
 const emit = defineEmits<{
 	'update:modelValue': [value: string];
@@ -39,11 +25,15 @@ const onNameEdit = (value: string) => {
 
 const enableNameEdit = () => {
 	isNameEdit.value = true;
-	void nextTick(() => nameInput.value?.focus());
+	void nextTick(() => {
+		if (nameInput.value) {
+			nameInput.value.focus();
+		}
+	});
 };
 
 const disableNameEdit = () => {
-	if (!props.modelValue && props.required) {
+	if (!props.modelValue) {
 		emit('update:modelValue', `Untitled ${props.type}`);
 		showToast({
 			title: 'Error',
@@ -64,30 +54,20 @@ onClickOutside(nameInput, disableNameEdit);
 		</span>
 		<div
 			v-else
-			:class="{
-				[$style.headline]: true,
-				[$style['headline-editable']]: true,
-				[$style.editing]: isNameEdit,
-			}"
+			:class="[$style.headline, $style['headline-editable']]"
 			@keydown.stop
 			@click="enableNameEdit"
 		>
 			<div v-if="!isNameEdit">
-				<span>
-					<n8n-text v-if="!modelValue" size="small" color="text-base">{{ placeholder }}</n8n-text>
-					<slot v-else>{{ modelValue }}</slot>
-				</span>
+				<span>{{ modelValue }}</span>
 				<i><font-awesome-icon icon="pen" /></i>
 			</div>
-			<div v-else :class="{ [$style.nameInput]: props.inputType !== 'textarea' }">
+			<div v-else :class="$style.nameInput">
 				<n8n-input
 					ref="nameInput"
 					:model-value="modelValue"
-					size="large"
-					:type="inputType"
-					:maxlength
-					:placeholder
-					:autosize
+					size="xlarge"
+					:maxlength="64"
 					@update:model-value="onNameEdit"
 					@change="disableNameEdit"
 				/>
@@ -117,21 +97,14 @@ onClickOutside(nameInput, disableNameEdit);
 	border-radius: var(--border-radius-base);
 	position: relative;
 	min-height: 22px;
-	max-height: v-bind(maxHeight);
-	font-weight: var(--font-weight-regular);
+	max-height: 22px;
+	font-weight: 400;
 
-	&.editing {
-		width: 100%;
-	}
 	i {
 		display: var(--headline-icon-display, none);
 		font-size: 0.75em;
 		margin-left: 8px;
 		color: var(--color-text-base);
-	}
-
-	:global(textarea) {
-		resize: none;
 	}
 }
 
@@ -158,6 +131,6 @@ onClickOutside(nameInput, disableNameEdit);
 	font-size: var(--font-size-2xs);
 	color: var(--color-text-light);
 	margin-left: 4px;
-	font-weight: var(--font-weight-regular);
+	font-weight: 400;
 }
 </style>

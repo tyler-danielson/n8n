@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useDebugInfo } from './useDebugInfo';
-import type { RootStoreState } from '@n8n/stores/useRootStore';
+import type { RootState } from '@/Interface';
 import type { useSettingsStore as useSettingsStoreType } from '@/stores/settings.store';
 import type { RecursivePartial } from '@/type-utils';
 
-vi.mock('@n8n/stores/useRootStore', () => ({
-	useRootStore: (): Partial<RootStoreState> => ({
+vi.mock('@/stores/root.store', () => ({
+	useRootStore: (): Partial<RootState> => ({
 		versionCli: '0.123.0',
 	}),
 }));
@@ -49,7 +49,7 @@ vi.mock('@/stores/settings.store', () => ({
 	useSettingsStore,
 }));
 
-vi.mock('@n8n/composables/useDeviceSupport', () => ({
+vi.mock('n8n-design-system', () => ({
 	useDeviceSupport: () => ({
 		isTouchDevice: false,
 		userAgent: 'Mozilla/5.0',
