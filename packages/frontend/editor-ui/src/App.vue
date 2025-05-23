@@ -1,29 +1,31 @@
 <script setup lang="ts">
-import '@/polyfills';
-
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import { useRoute } from 'vue-router';
+import { v4 as uuid } from 'uuid';
 import LoadingView from '@/views/LoadingView.vue';
 import BannerStack from '@/components/banners/BannerStack.vue';
+import AskAssistantChat from '@/components/AskAssistant/AskAssistantChat.vue';
 import Modals from '@/components/Modals.vue';
 import Telemetry from '@/components/Telemetry.vue';
-import AskAssistantFloatingButton from '@/components/AskAssistant/Chat/AskAssistantFloatingButton.vue';
-import AssistantsHub from '@/components/AskAssistant/AssistantsHub.vue';
+import AskAssistantFloatingButton from '@/components/AskAssistant/AskAssistantFloatingButton.vue';
 import { loadLanguage } from '@/plugins/i18n';
 import { APP_MODALS_ELEMENT_ID, HIRING_BANNER, VIEWS } from '@/constants';
-import { useRootStore } from '@n8n/stores/useRootStore';
+import { useRootStore } from '@/stores/root.store';
 import { useAssistantStore } from '@/stores/assistant.store';
-import { useBuilderStore } from '@/stores/builder.store';
 import { useUIStore } from '@/stores/ui.store';
 import { useUsersStore } from '@/stores/users.store';
 import { useSettingsStore } from '@/stores/settings.store';
 import { useHistoryHelper } from '@/composables/useHistoryHelper';
 import { useStyles } from './composables/useStyles';
 
+// Polyfill crypto.randomUUID
+if (!('randomUUID' in crypto)) {
+	Object.defineProperty(crypto, 'randomUUID', { value: uuid });
+}
+
 const route = useRoute();
 const rootStore = useRootStore();
 const assistantStore = useAssistantStore();
-const builderStore = useBuilderStore();
 const uiStore = useUIStore();
 const usersStore = useUsersStore();
 const settingsStore = useSettingsStore();
@@ -41,7 +43,6 @@ const hasContentFooter = ref(false);
 const appGrid = ref<Element | null>(null);
 
 const assistantSidebarWidth = computed(() => assistantStore.chatWidth);
-const builderSidebarWidth = computed(() => builderStore.chatWidth);
 
 onMounted(async () => {
 	setAppZIndexes();
@@ -64,12 +65,12 @@ const logHiringBanner = () => {
 const updateGridWidth = async () => {
 	await nextTick();
 	if (appGrid.value) {
-		const { width, height } = appGrid.value.getBoundingClientRect();
-		uiStore.appGridDimensions = { width, height };
+		uiStore.appGridWidth = appGrid.value.clientWidth;
 	}
 };
+
 // As assistant sidebar width changes, recalculate the total width regularly
-watch([assistantSidebarWidth, builderSidebarWidth], async () => {
+watch(assistantSidebarWidth, async () => {
 	await updateGridWidth();
 });
 
@@ -82,6 +83,8 @@ watch(route, (r) => {
 watch(defaultLocale, (newLocale) => {
 	void loadLanguage(newLocale);
 });
+
+
 </script>
 
 <template>
@@ -99,22 +102,22 @@ watch(defaultLocale, (newLocale) => {
 				<BannerStack v-if="!isDemoMode" />
 			</div>
 			<div id="header" :class="$style.header">
-				<RouterView name="header" />
+				<router-view name="header"></router-view>
 			</div>
 			<div v-if="usersStore.currentUser" id="sidebar" :class="$style.sidebar">
-				<RouterView name="sidebar" />
+				<router-view name="sidebar"></router-view>
 			</div>
 			<div id="content" :class="$style.content">
 				<div :class="$style.contentWrapper">
-					<RouterView v-slot="{ Component }">
-						<KeepAlive v-if="$route.meta.keepWorkflowAlive" include="NodeView" :max="1">
+					<router-view v-slot="{ Component }">
+						<keep-alive v-if="$route.meta.keepWorkflowAlive" include="NodeViewSwitcher" :max="1">
 							<component :is="Component" />
-						</KeepAlive>
+						</keep-alive>
 						<component :is="Component" v-else />
-					</RouterView>
+					</router-view>
 				</div>
 				<div v-if="hasContentFooter" :class="$style.contentFooter">
-					<RouterView name="footer" />
+					<router-view name="footer" />
 				</div>
 			</div>
 			<div :id="APP_MODALS_ELEMENT_ID" :class="$style.modals">
@@ -123,7 +126,7 @@ watch(defaultLocale, (newLocale) => {
 			<Telemetry />
 			<AskAssistantFloatingButton v-if="showAssistantButton" />
 		</div>
-		<AssistantsHub />
+		<AskAssistantChat />
 	</div>
 </template>
 
@@ -191,8 +194,6 @@ watch(defaultLocale, (newLocale) => {
 .header {
 	grid-area: header;
 	z-index: var(--z-index-app-header);
-	min-width: 0;
-	min-height: 0;
 }
 
 .sidebar {

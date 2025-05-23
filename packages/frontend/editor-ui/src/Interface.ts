@@ -1,5 +1,6 @@
 import type { Component } from 'vue';
 import type { NotificationOptions as ElementNotificationOptions } from 'element-plus';
+import type { Connection } from '@jsplumb/core';
 import type {
 	BannerName,
 	FrontendSettings,
@@ -8,7 +9,7 @@ import type {
 	IVersionNotificationSettings,
 } from '@n8n/api-types';
 import type { Scope } from '@n8n/permissions';
-import type { NodeCreatorTag } from '@n8n/design-system';
+import type { NodeCreatorTag } from 'n8n-design-system';
 import type {
 	GenericValue,
 	IConnections,
@@ -43,7 +44,6 @@ import type {
 	IPersonalizationSurveyAnswersV4,
 	AnnotationVote,
 	ITaskData,
-	ISourceData,
 } from 'n8n-workflow';
 
 import type {
@@ -54,14 +54,13 @@ import type {
 	REGULAR_NODE_CREATOR_VIEW,
 	AI_OTHERS_NODE_CREATOR_VIEW,
 	ROLE,
-	AI_UNCATEGORIZED_CATEGORY,
 } from '@/constants';
 import type { BulkCommand, Undoable } from '@/models/history';
+import type { PartialBy } from '@/utils/typeHelpers';
 
 import type { ProjectSharingData } from '@/types/projects.types';
-import type { PathItem } from '@n8n/design-system/components/N8nBreadcrumbs/Breadcrumbs.vue';
 
-export * from '@n8n/design-system/types';
+export * from 'n8n-design-system/types';
 
 declare global {
 	interface Window {
@@ -111,16 +110,6 @@ declare global {
 			getVariant: (name: string) => string | boolean | undefined;
 			override: (name: string, value: string) => void;
 		};
-		// https://developer.mozilla.org/en-US/docs/Web/API/DocumentPictureInPicture
-		documentPictureInPicture?: {
-			window: Window | null;
-			requestWindow: (options?: {
-				width?: number;
-				height?: number;
-				preferInitialWindowPlacement?: boolean;
-				disallowReturnToOpener?: boolean;
-			}) => Promise<Window>;
-		};
 		// eslint-disable-next-line @typescript-eslint/naming-convention
 		Cypress: unknown;
 	}
@@ -158,8 +147,6 @@ export interface INodeUpdatePropertiesInformation {
 
 export type XYPosition = [number, number];
 
-export type DraggableMode = 'mapping' | 'panel-resize' | 'move';
-
 export interface INodeUi extends INode {
 	position: XYPosition;
 	color?: string;
@@ -190,7 +177,6 @@ export interface IAiDataContent {
 	data: INodeExecutionData[] | null;
 	inOut: 'input' | 'output';
 	type: NodeConnectionType;
-	source?: Array<ISourceData | null>;
 	metadata: {
 		executionTime: number;
 		startTime: number;
@@ -216,12 +202,6 @@ export interface IStartRunData {
 	triggerToStartFrom?: {
 		name: string;
 		data?: ITaskData;
-	};
-	agentRequest?: {
-		query: NodeParameterValueType;
-		tool: {
-			name: NodeParameterValueType;
-		};
 	};
 }
 
@@ -260,7 +240,6 @@ export interface IWorkflowDataUpdate {
 	pinData?: IPinData;
 	versionId?: string;
 	meta?: WorkflowMetadata;
-	parentFolderId?: string;
 }
 
 export interface IWorkflowDataCreate extends IWorkflowDataUpdate {
@@ -323,7 +302,6 @@ export interface IWorkflowDb {
 	id: string;
 	name: string;
 	active: boolean;
-	isArchived: boolean;
 	createdAt: number | string;
 	updatedAt: number | string;
 	nodes: INodeUi[];
@@ -337,73 +315,7 @@ export interface IWorkflowDb {
 	versionId: string;
 	usedCredentials?: IUsedCredential[];
 	meta?: WorkflowMetadata;
-	parentFolder?: {
-		id: string;
-		name: string;
-		parentFolderId: string | null;
-		createdAt?: string;
-		updatedAt?: string;
-	};
 }
-
-// For workflow list we don't need the full workflow data
-export type BaseResource = {
-	id: string;
-	name: string;
-};
-
-export type WorkflowListItem = Omit<
-	IWorkflowDb,
-	'nodes' | 'connections' | 'settings' | 'pinData' | 'usedCredentials' | 'meta'
-> & {
-	resource: 'workflow';
-};
-
-export type FolderShortInfo = {
-	id: string;
-	name: string;
-	parentFolder?: string;
-};
-
-export type BaseFolderItem = BaseResource & {
-	createdAt: string;
-	updatedAt: string;
-	workflowCount: number;
-	subFolderCount: number;
-	parentFolder?: ResourceParentFolder;
-	homeProject?: ProjectSharingData;
-	sharedWithProjects?: ProjectSharingData[];
-	tags?: ITag[];
-};
-
-export type ResourceParentFolder = {
-	id: string;
-	name: string;
-	parentFolderId: string | null;
-};
-
-export interface FolderListItem extends BaseFolderItem {
-	resource: 'folder';
-}
-
-export interface ChangeLocationSearchResult extends BaseFolderItem {
-	resource: 'folder' | 'project';
-}
-
-export type FolderPathItem = PathItem & { parentFolder?: string };
-
-export type WorkflowListResource = WorkflowListItem | FolderListItem;
-
-export type FolderCreateResponse = Omit<
-	FolderListItem,
-	'workflowCount' | 'tags' | 'sharedWithProjects' | 'homeProject'
->;
-
-export type FolderTreeResponseItem = {
-	id: string;
-	name: string;
-	children: FolderTreeResponseItem[];
-};
 
 // Identical to cli.Interfaces.ts
 export interface IWorkflowShortResponse {
@@ -468,9 +380,9 @@ export interface IExecutionBase {
 	status: ExecutionStatus;
 	retryOf?: string;
 	retrySuccessId?: string;
-	startedAt: Date | string;
-	createdAt: Date | string;
-	stoppedAt?: Date | string;
+	startedAt: Date;
+	createdAt: Date;
+	stoppedAt?: Date;
 	workflowId?: string; // To be able to filter executions easily //
 }
 
@@ -493,7 +405,6 @@ export interface IExecutionResponse extends IExecutionBase {
 	data?: IRunExecutionData;
 	workflowData: IWorkflowDb;
 	executedNode?: string;
-	triggerNode?: string;
 }
 
 export type ExecutionSummaryWithScopes = ExecutionSummary & { scopes: Scope[] };
@@ -810,7 +721,6 @@ export interface ActionTypeDescription extends SimplifiedNodeType {
 	displayOptions?: IDisplayOptions;
 	values?: IDataObject;
 	actionKey: string;
-	outputConnectionType?: NodeConnectionType;
 	codex: {
 		label: string;
 		categories: string[];
@@ -830,8 +740,6 @@ export interface CreateElementBase {
 export interface NodeCreateElement extends CreateElementBase {
 	type: 'node';
 	subcategory: string;
-	resource?: string;
-	operation?: string;
 	properties: SimplifiedNodeType;
 }
 
@@ -938,8 +846,6 @@ export interface ITemplatesNode extends IVersionNode {
 
 export interface INodeMetadata {
 	parametersLastUpdatedAt?: number;
-	pinnedDataLastUpdatedAt?: number;
-	pinnedDataLastRemovedAt?: number;
 	pristine: boolean;
 }
 
@@ -968,6 +874,32 @@ export interface WorkflowsState {
 	workflowsById: IWorkflowsMap;
 	chatMessages: string[];
 	isInDebugMode?: boolean;
+}
+
+export interface RootState {
+	baseUrl: string;
+	restEndpoint: string;
+	defaultLocale: string;
+	endpointForm: string;
+	endpointFormTest: string;
+	endpointFormWaiting: string;
+	endpointWebhook: string;
+	endpointWebhookTest: string;
+	endpointWebhookWaiting: string;
+	pushConnectionActive: boolean;
+	timezone: string;
+	executionTimeout: number;
+	maxExecutionTimeout: number;
+	versionCli: string;
+	oauthCallbackUrls: object;
+	n8nMetadata: {
+		[key: string]: string | number | undefined;
+	};
+	pushRef: string;
+	urlBaseWebhook: string;
+	urlBaseEditor: string;
+	instanceId: string;
+	binaryDataMode: 'default' | 'filesystem' | 's3';
 }
 
 export interface NodeMetadataMap {
@@ -1078,8 +1010,7 @@ export type NodeFilterType =
 	| typeof REGULAR_NODE_CREATOR_VIEW
 	| typeof TRIGGER_NODE_CREATOR_VIEW
 	| typeof AI_NODE_CREATOR_VIEW
-	| typeof AI_OTHERS_NODE_CREATOR_VIEW
-	| typeof AI_UNCATEGORIZED_CATEGORY;
+	| typeof AI_OTHERS_NODE_CREATOR_VIEW;
 
 export type NodeCreatorOpenSource =
 	| ''
@@ -1227,7 +1158,6 @@ export interface ITabBarItem {
 
 export interface IResourceLocatorResultExpanded extends INodeListSearchItems {
 	linkAlt?: string;
-	isArchived?: boolean;
 }
 
 export interface CurlToJSONResponse {
@@ -1370,6 +1300,41 @@ export type ExecutionsQueryFilter = {
 	vote?: ExecutionFilterVote;
 };
 
+export type SamlAttributeMapping = {
+	email: string;
+	firstName: string;
+	lastName: string;
+	userPrincipalName: string;
+};
+
+export type SamlLoginBinding = 'post' | 'redirect';
+
+export type SamlSignatureConfig = {
+	prefix: 'ds';
+	location: {
+		reference: '/samlp:Response/saml:Issuer';
+		action: 'after';
+	};
+};
+
+export type SamlPreferencesLoginEnabled = {
+	loginEnabled: boolean;
+};
+
+export type SamlPreferences = {
+	mapping?: SamlAttributeMapping;
+	metadata?: string;
+	metadataUrl?: string;
+	ignoreSSL?: boolean;
+	loginBinding?: SamlLoginBinding;
+	acsBinding?: SamlLoginBinding;
+	authnRequestsSigned?: boolean;
+	loginLabel?: string;
+	wantAssertionsSigned?: boolean;
+	wantMessageSigned?: boolean;
+	signatureConfig?: SamlSignatureConfig;
+} & PartialBy<SamlPreferencesLoginEnabled, 'loginEnabled'>;
+
 export type SamlPreferencesExtractedData = {
 	entityID: string;
 	returnUrl: string;
@@ -1465,8 +1430,7 @@ export type CloudUpdateLinkSourceType =
 	| 'worker-view'
 	| 'external-secrets'
 	| 'rbac'
-	| 'debug'
-	| 'insights';
+	| 'debug';
 
 export type UTMCampaign =
 	| 'upgrade-custom-data-filter'
@@ -1489,8 +1453,7 @@ export type UTMCampaign =
 	| 'upgrade-worker-view'
 	| 'upgrade-external-secrets'
 	| 'upgrade-rbac'
-	| 'upgrade-debug'
-	| 'upgrade-insights';
+	| 'upgrade-debug';
 
 export type N8nBanners = {
 	[key in BannerName]: {
@@ -1520,11 +1483,20 @@ export type ToggleNodeCreatorOptions = {
 	source?: NodeCreatorOpenSource;
 	nodeCreatorView?: NodeFilterType;
 	hasAddedNodes?: boolean;
-	connectionType?: NodeConnectionType;
 };
 
-export type AppliedThemeOption = 'light' | 'dark';
+export type AppliedThemeOption = 'light' | 'dark' | 'activu';
 export type ThemeOption = AppliedThemeOption | 'system';
+
+export type NewConnectionInfo = {
+	sourceId: string;
+	index: number;
+	eventSource: NodeCreatorOpenSource;
+	connection?: Connection;
+	nodeCreatorView?: NodeFilterType;
+	outputType?: NodeConnectionType;
+	endpointUuid?: string;
+};
 
 export type EnterpriseEditionFeatureKey =
 	| 'AdvancedExecutionFilters'
@@ -1539,14 +1511,21 @@ export type EnterpriseEditionFeatureKey =
 	| 'DebugInEditor'
 	| 'WorkflowHistory'
 	| 'WorkerView'
-	| 'AdvancedPermissions'
-	| 'ApiKeyScopes';
+	| 'AdvancedPermissions';
 
 export type EnterpriseEditionFeatureValue = keyof Omit<FrontendSettings['enterprise'], 'projects'>;
 
 export interface IN8nPromptResponse {
 	updated: boolean;
 }
+
+export type ApiKey = {
+	id: string;
+	label: string;
+	apiKey: string;
+	createdAt: string;
+	updatedAt: string;
+};
 
 export type InputPanel = {
 	nodeName?: string;
@@ -1558,7 +1537,6 @@ export type InputPanel = {
 };
 
 export type OutputPanel = {
-	run?: number;
 	branch?: number;
 	data: {
 		isEmpty: boolean;
@@ -1587,10 +1565,3 @@ export type MainPanelDimensions = Record<
 		relativeWidth: number;
 	}
 >;
-
-export interface LlmTokenUsageData {
-	completionTokens: number;
-	promptTokens: number;
-	totalTokens: number;
-	isEstimate: boolean;
-}
